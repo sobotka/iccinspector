@@ -6,6 +6,8 @@ import struct
 import sys
 import os
 import datetime
+import argparse
+import textwrap
 
 _colorspacesignatures = {
     "XYZ ": "nCIEXYZ or PCSXYZ",
@@ -85,7 +87,7 @@ def unpack_s15Fixed16Number(s):
 
 def unpack_tagSignature(s):
     """Convert sequence of 4 bytes into a string."""
-    return struct.unpack("=4s", s)[0].decode("utf-8")
+    return struct.unpack("4s", s)[0].decode("utf-8")
 
 
 def unpack_uInt32Number(s):
@@ -783,6 +785,97 @@ class iccReserved(iccProfileElement):
         )
 
 
+class iccTag(iccProfileElement):
+    def __init__(self, offset):
+        super(iccTag, self).__init__(offset, 12)
+        self._tagsignature = None
+        self._tagoffset = None
+        self._tagsize = None
+
+    @property
+    def signature(self):
+        return self._tagsignature
+
+    def read(self, buffer):
+        try:
+            tagbuffer = buffer[self._slice]
+            self._tagsignature = unpack_tagSignature(tagbuffer[0:4])
+            self._tagoffset = unpack_uInt32Number(tagbuffer[4:8])
+            self._tagsize = unpack_uInt32Number(tagbuffer[8:12])
+
+        except Exception:
+            raise ICCFileError("error while reading tag signature")
+
+    def __repr__(self):
+        return "<class '{0}({1}, tag('{2}'))'>".format(
+            self.__class__.__name__, self._slice, self._tagsignature
+        )
+
+    def __str__(self):
+        return "{} Offset: {:<5} Size: {:<10}".format(
+            "{:<10}".format("\"" + str(self._tagsignature) + "\","),
+            "{:<10}".format(str(self._tagoffset) + ","),
+            str(self._tagsize)
+        )
+
+
+class iccTagTable(iccProfileElement):
+    def __init__(self):
+        super(iccTagTable, self).__init__(128, 4)
+        self._tagcount = None
+        self._tags = None
+
+    @property
+    def count(self):
+        return self._tagcount
+
+    @property
+    def tags(self):
+        return self._tags
+
+    def read(self, buffer):
+        try:
+            tagtablebuffer = buffer[self._slice]
+            self._tagcount = unpack_uInt32Number(tagtablebuffer)
+
+            self._tags = numpy.empty(
+                self._tagcount,
+                dtype=[("signature", "U4"), ("tag", object)]
+            )
+
+            for count in range(self._tagcount):
+                tag = iccTag((count * 12) + 132)
+                tag.read(buffer)
+                self._tags[count] = (tag.signature, tag)
+
+        except Exception:
+            raise ICCFileError("file doesn't appear to have a tag table")
+
+    def __repr__(self):
+        return "<class '{0}({1}, tagtable('{2}'))'>".format(
+            self.__class__.__name__, self._slice, self._tagcount
+        )
+
+    def __str__(self):
+        tagstring = ""
+        for index, tag in numpy.ndenumerate(self._tags):
+            if index[0] == 0:
+                tagstring += str(tag["tag"])
+            else:
+                tagstring += "\n{:35}{:<}".format(
+                    "",
+                    str(tag["tag"])
+                )
+        return "{:>30}{:5}{:<}\n{:>30}{:5}{:10}".format(
+            "Tag Table Count:",
+            "",
+            str(self._tagcount),
+            "Tag Signatures:",
+            "",
+            tagstring
+        )
+
+
 class iccProfile:
     def __init__(self):
         self._profilesize = iccProfileSize()
@@ -803,6 +896,7 @@ class iccProfile:
         self._profilecreator = iccProfileCreator()
         self._profileid = iccProfileID()
         self._reserved = iccReserved()
+        self._tagtable = iccTagTable()
 
     def read(self, buffer):
         for _, var in vars(self).items():
@@ -824,9 +918,15 @@ class iccProfile:
 
 if __name__ == "__main__":
     try:
+        parser = argparse.ArgumentParser(
+            prog='iccinspector'
+        )
+        parser.add_argument("iccfile")
+        args = parser.parse_args()
+
         numpy.set_printoptions(15)
 
-        with open(sys.argv[1], 'rb') as f:
+        with open(args.iccfile, 'rb') as f:
             s = memoryview(f.read())
 
             testField = iccProfile()
@@ -834,11 +934,6 @@ if __name__ == "__main__":
             print(testField)
 
     except ICCFileError as e:
-        print("Error encountered when attempting to load the ICC / ICM. "
-              "Error:", e)
-    except FileNotFoundError as e:
-        print("Unable to find file. Error:", e)
-    except IndexError as e:
-        print("Usage: iccinspector iccfile", e)
+        print("Error loading ICC / ICM file: {}".format(e))
     except Exception as e:
         raise

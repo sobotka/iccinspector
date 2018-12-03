@@ -85,19 +85,29 @@ def unpack_s15Fixed16Number(s):
         numpy.frombuffer(s, numpy.dtype(">i4"), len(s) // 4), 2**16)
 
 
+def unpack_string(s):
+    """Convert sequence of n bytes into a string"""
+    return struct.unpack("{}s".format(len(s)), s)[0].decode("utf-8")
+
+
 def unpack_tagSignature(s):
     """Convert sequence of 4 bytes into a string."""
     return struct.unpack("4s", s)[0].decode("utf-8")
 
 
-def unpack_uInt32Number(s):
-    """Convert sequence of 4 bytes into a big endian 32 bit unsigned int."""
-    return struct.unpack(">I", s)[0]
+def unpack_uInt8Number(s):
+    """Convert sequence of 1 byte into an 8 bit unsigned int."""
+    return struct.unpack(">B", s)[0]
 
 
 def unpack_uInt16Number(s):
     """Convert sequence of 2 bytes into a big endian 16 bit unsigned int."""
     return struct.unpack(">H", s)[0]
+
+
+def unpack_uInt32Number(s):
+    """Convert sequence of 4 bytes into a big endian 32 bit unsigned int."""
+    return struct.unpack(">I", s)[0]
 
 
 class XYZNumber:
@@ -132,8 +142,11 @@ class XYZNumber:
             self.__class__.__name__, self._XYZ)
 
     def __str__(self):
-        return "X: {0:<015}, Y: {1:<015}, Z:{2:<015}".format(
-            float(self._XYZ[0]), float(self._XYZ[1]), float(self._XYZ[2]))
+        return "[X: {} Y: {} Z:{}]".format(
+            "{:<.15f}{}".format(self._XYZ[0], ","),
+            "{:<.15f}{}".format(self._XYZ[1], ","),
+            "{:<.15f}".format(self._XYZ[2])
+        )
 
 
 class iccProfileElement:
@@ -148,6 +161,193 @@ class iccProfileElement:
     def __repr__(self):
         return "<class '{0}({1})'>".format(
             self.__class__.__name__, self._slice
+        )
+
+
+# All ICC types ar defined below, based off of the iccProfileElement.
+# To add an unsupported type, simply define a new class based off
+# of iccProfileElement with the four letter tag signature as the
+# first four letters of the class, followed by "Type". For example,
+# the desc type is defined as descType. The module will automatically
+# parse the function name from iccTag, calling the read() function
+# of the defined type.
+
+
+# textDescriptionType, identifier "desc"
+class descType(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(descType, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._asciicount = None
+        self._asciidescription = None
+        self._unicodecode = None
+        self._unicodecount = None
+        self._unicodedescription = None
+        self._scriptcodecode = None
+        self._scriptcodecount = None
+        self._scriptcodedescription = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            desctypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(desctypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(desctypebuffer[4:8])
+            self._asciicount = unpack_uInt32Number(desctypebuffer[8:12])
+            endofascii = 12 + self._asciicount
+            self._asciidescription = unpack_string(
+                desctypebuffer[12:endofascii]
+            )
+            self._unicodecode = unpack_uInt32Number(
+                desctypebuffer[endofascii:endofascii + 4]
+            )
+            self._unicodecount = unpack_uInt32Number(
+                desctypebuffer[endofascii + 4:endofascii + 8]
+            )
+            endofunicode = endofascii + self._unicodecount + 8
+            self._unicodedescription = unpack_string(
+                desctypebuffer[endofascii + 8:endofunicode]
+            )
+            self._scriptcodecode = unpack_uInt16Number(
+                desctypebuffer[endofunicode:endofunicode + 2]
+            )
+            self._scriptcodecount = unpack_uInt8Number(
+                desctypebuffer[endofunicode + 2:endofunicode + 3]
+            )
+            self._scriptcodedescription = unpack_string(
+                desctypebuffer[endofunicode + 3:endofunicode + 70]
+            )
+
+        except Exception:
+            raise ICCFileError("problem loading descType")
+
+    def __str__(self):
+        return "[\"{}\", {}, {}, \"{}\", {}, {}, \"{}\", {}, {}, \"{}\"]" \
+            .format(
+                self._typesignature,
+                self._reserved,
+                self._asciicount,
+                self._asciidescription,
+                self._unicodecode,
+                self._unicodecount,
+                self._unicodedescription,
+                self._scriptcodecode,
+                self._scriptcodecount,
+                self._scriptcodedescription
+            )
+
+
+# textType, identifier "text"
+class textType(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(textType, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._description = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            texttypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(texttypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(texttypebuffer[4:8])
+            self._description = unpack_string(texttypebuffer[8:])
+
+        except Exception:
+            raise ICCFileError("problem loading textType")
+
+    def __str__(self):
+        return "[\"{}\", {}, \"{}\"]".format(
+            self._typesignature,
+            self._reserved,
+            self._description
+        )
+
+
+class XYZ_Type(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(XYZ_Type, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._XYZ = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            xyztypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(xyztypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(xyztypebuffer[4:8])
+
+            xyzcount = (self._slice.stop - self._slice.start - 8) // 12
+            self._XYZ = numpy.empty(xyzcount, dtype=object)
+
+            for count in range(xyzcount):
+                self._XYZ[count] = XYZNumber()
+
+                start = (count * 12) + 8
+                stop = ((count + 1) * 12) + 8
+                self._XYZ[count].read(xyztypebuffer[start:stop])
+
+        except Exception as e:
+            raise ICCFileError("problem loading XYZ_Type")
+
+    def __str__(self):
+        xyzstring = ""
+        for index, xyznumber in numpy.ndenumerate(self._XYZ):
+            if index[0] == 0:
+                xyzstring += str(xyznumber)
+            else:
+                xyzstring += "\n{:35}{:<}".format(
+                    "",
+                    str(xyznumber)
+                )
+        return "[\"{}\", {}, {}]".format(
+            self._typesignature,
+            self._reserved,
+            xyzstring
+        )
+
+
+class sf32Type(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(sf32Type, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._sf32 = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            sf32typebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(sf32typebuffer[0:4])
+            self._reserved = unpack_uInt32Number(sf32typebuffer[4:8])
+
+            sf32count = (self._slice.stop - self._slice.start - 8) // 4
+            print("manual:", (self._slice.stop - self._slice.start - 8))
+            print("sf32count: ", sf32count)
+
+            self._sf32 = unpack_s15Fixed16Number(
+                sf32typebuffer[8:self._slice.stop]
+            )
+            print(self._sf32)
+
+        except Exception as e:
+            print(e)
+            raise ICCFileError("problem loading sf32Type")
+
+    def __str__(self):
+        sf32string = ""
+        for index, sf32number in numpy.ndenumerate(self._sf32):
+            if index[0] == 0:
+                sf32string += "[" + str(sf32number)
+            else:
+                sf32string += ", {:<.15f}".format(sf32number)
+        sf32string += "]"
+        return "[\"{}\", {}, {}]".format(
+            self._typesignature,
+            self._reserved,
+            sf32string
         )
 
 
@@ -675,9 +875,6 @@ class iccPCSIlluminant(iccProfileElement):
             pcsilluminantxyzbuffer = buffer[self._slice]
             self._pcsilluminant.read(pcsilluminantxyzbuffer)
 
-            if (None):
-                raise Exception
-
         except Exception:
             raise ICCFileError(
                 "file doesn't appear to have a rendering intent")
@@ -791,6 +988,7 @@ class iccTag(iccProfileElement):
         self._tagsignature = None
         self._tagoffset = None
         self._tagsize = None
+        self._type = None
 
     @property
     def signature(self):
@@ -803,6 +1001,30 @@ class iccTag(iccProfileElement):
             self._tagoffset = unpack_uInt32Number(tagbuffer[4:8])
             self._tagsize = unpack_uInt32Number(tagbuffer[8:12])
 
+            # print(sys.modules["iccinspector"])
+            try:
+                signaturetype = unpack_tagSignature(
+                    buffer[
+                        self._tagoffset:self._tagoffset + 4
+                    ]
+                )
+
+                signaturetype = signaturetype.replace(" ", "_")
+
+                signatureclass = getattr(
+                    sys.modules[__name__],
+                    "{}Type".format(signaturetype)
+                )
+
+                self._type = signatureclass(
+                    self._tagoffset,
+                    self._tagsize,
+                    buffer
+                )
+
+            except AttributeError:
+                pass
+
         except Exception:
             raise ICCFileError("error while reading tag signature")
 
@@ -812,10 +1034,11 @@ class iccTag(iccProfileElement):
         )
 
     def __str__(self):
-        return "{} Offset: {:<5} Size: {:<10}".format(
-            "{:<10}".format("\"" + str(self._tagsignature) + "\","),
-            "{:<10}".format(str(self._tagoffset) + ","),
-            str(self._tagsize)
+        return "{} Offset: {} Size: {} {}".format(
+            "{:<8}".format("\"" + str(self._tagsignature) + "\","),
+            "{:<8}".format(str(self._tagoffset) + ","),
+            "{:<8}".format(str(self._tagsize) + ","),
+            str(self._type)
         )
 
 
@@ -898,6 +1121,10 @@ class iccProfile:
         self._reserved = iccReserved()
         self._tagtable = iccTagTable()
 
+    @property
+    def tags(self):
+        return self._tagtable.tags
+
     def read(self, buffer):
         for _, var in vars(self).items():
             var.read(buffer)
@@ -921,17 +1148,34 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(
             prog='iccinspector'
         )
-        parser.add_argument("iccfile")
+        parser.add_argument(
+            "iccfile",
+            type=argparse.FileType("rb")
+        )
+        parser.add_argument(
+            "-t",
+            dest="tagsignature",
+            action="append",
+            help="specify tag signature to be inspected"
+        )
         args = parser.parse_args()
 
         numpy.set_printoptions(15)
 
-        with open(args.iccfile, 'rb') as f:
+        with args.iccfile as f:
             s = memoryview(f.read())
 
             testField = iccProfile()
             testField.read(s)
             print(testField)
+
+            # for tagsignature in args.tagsignature:
+            #     print(
+            #         testField.tags[
+            #             numpy.where(testField.tags["signature"] ==
+            #             tagsignature)
+            #         ]
+            #     )
 
     except ICCFileError as e:
         print("Error loading ICC / ICM file: {}".format(e))

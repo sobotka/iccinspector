@@ -289,7 +289,7 @@ class XYZ_Type(iccProfileElement):
                 stop = ((count + 1) * 12) + 8
                 self._XYZ[count].read(xyztypebuffer[start:stop])
 
-        except Exception as e:
+        except Exception:
             raise ICCFileError("problem loading XYZ_Type")
 
     def __str__(self):
@@ -324,16 +324,12 @@ class sf32Type(iccProfileElement):
             self._reserved = unpack_uInt32Number(sf32typebuffer[4:8])
 
             sf32count = (self._slice.stop - self._slice.start - 8) // 4
-            print("manual:", (self._slice.stop - self._slice.start - 8))
-            print("sf32count: ", sf32count)
 
             self._sf32 = unpack_s15Fixed16Number(
                 sf32typebuffer[8:self._slice.stop]
             )
-            print(self._sf32)
 
-        except Exception as e:
-            print(e)
+        except Exception:
             raise ICCFileError("problem loading sf32Type")
 
     def __str__(self):

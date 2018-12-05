@@ -142,7 +142,7 @@ class XYZNumber:
             self.__class__.__name__, self._XYZ)
 
     def __str__(self):
-        return "[X: {} Y: {} Z:{}]".format(
+        return "[X: {} Y: {} Z: {}]".format(
             "{:<.15f}{}".format(self._XYZ[0], ","),
             "{:<.15f}{}".format(self._XYZ[1], ","),
             "{:<.15f}".format(self._XYZ[2])
@@ -273,6 +273,10 @@ class XYZ_Type(iccProfileElement):
         self._XYZ = None
         self.read(buffer)
 
+    @property
+    def value(self):
+        return self._XYZ
+
     def read(self, buffer):
         try:
             xyztypebuffer = buffer[self._slice]
@@ -316,6 +320,10 @@ class sf32Type(iccProfileElement):
         self._reserved = None
         self._sf32 = None
         self.read(buffer)
+
+    @property
+    def value(self):
+        return self._sf32
 
     def read(self, buffer):
         try:
@@ -989,6 +997,10 @@ class iccTag(iccProfileElement):
     @property
     def signature(self):
         return self._tagsignature
+
+    @property
+    def type(self):
+        return self._type
 
     def read(self, buffer):
         try:

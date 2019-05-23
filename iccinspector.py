@@ -113,6 +113,7 @@ def unpack_uInt32Number(s):
 class XYZNumber:
     def __init__(self):
         self._XYZ = numpy.array([0., 0., 0.])
+        self._xyY = numpy.array([0., 0., 0.])
 
     @property
     def XYZ(self):
@@ -130,9 +131,17 @@ class XYZNumber:
     def Z(self):
         return self._XYZ[2]
 
+    @property
+    def xyY(self):
+        return self._xyY
+
     def read(self, buffer):
         try:
             self._XYZ = unpack_s15Fixed16Number(buffer)
+            XYZ_sum = numpy.sum(self._XYZ)
+            self._xyY[0] = self._XYZ[0] / XYZ_sum
+            self._xyY[1] = self._XYZ[1] / XYZ_sum
+            self._xyY[2] = self._XYZ[1]
 
         except Exception:
             raise ICCFileError("file doesn't appear to have a profile size")
@@ -142,10 +151,13 @@ class XYZNumber:
             self.__class__.__name__, self._XYZ)
 
     def __str__(self):
-        return "[X: {} Y: {} Z: {}]".format(
+        return "[X: {} Y: {} Z: {}][x: {} y: {} Y: {}]".format(
             "{:<.15f}{}".format(self._XYZ[0], ","),
             "{:<.15f}{}".format(self._XYZ[1], ","),
-            "{:<.15f}".format(self._XYZ[2])
+            "{:<.15f}".format(self._XYZ[2]),
+            "{:<.15f}{}".format(self._xyY[0], ","),
+            "{:<.15f}{}".format(self._xyY[1], ","),
+            "{:<.15f}".format(self._xyY[2])
         )
 
 

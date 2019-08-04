@@ -110,6 +110,17 @@ def unpack_uInt32Number(s):
     return struct.unpack(">I", s)[0]
 
 
+def unpack_u8Fixed8Number(s):
+    """Convert buffer of ICC u8Fixed8Number to array of float."""
+    try:
+        out = numpy.divide(
+            numpy.frombuffer(s, numpy.dtype(">u2"), len(s) // 2), 2**8)
+    except Exception as e:
+        print("here")
+        print(e)
+    return out
+
+
 class XYZNumber:
     def __init__(self):
         self._XYZ = numpy.array([0., 0., 0.])
@@ -139,8 +150,10 @@ class XYZNumber:
         try:
             self._XYZ = unpack_s15Fixed16Number(buffer)
             XYZ_sum = numpy.sum(self._XYZ)
-            self._xyY[0] = self._XYZ[0] / XYZ_sum
-            self._xyY[1] = self._XYZ[1] / XYZ_sum
+            self._xyY[0] = numpy.divide(
+                self._XYZ[0], XYZ_sum, where=XYZ_sum != 0)
+            self._xyY[1] = numpy.divide(
+                self._XYZ[1], XYZ_sum, where=XYZ_sum != 0)
             self._xyY[2] = self._XYZ[1]
 
         except Exception:
@@ -183,6 +196,116 @@ class iccProfileElement:
 # the desc type is defined as descType. The module will automatically
 # parse the function name from iccTag, calling the read() function
 # of the defined type.
+
+# curvType, identifier "curv"
+class curvType(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(curvType, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._entriescount = None
+        self._curve = None
+        self._curvetype = None
+        self.read(buffer)
+
+    @property
+    def value(self):
+        return self._curve
+
+    def read(self, buffer):
+        try:
+            curvetypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(curvetypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(curvetypebuffer[4:8])
+            self._entriescount = unpack_uInt32Number(curvetypebuffer[8:12])
+
+            if self._entriescount == 0:
+                # Curve type is an identity
+                self._curvetype = "Identity Curve"
+            elif self._entriescount == 1:
+                # Curve type is a pure power function
+                self._curvetype = "Power Function"
+                self._curve = unpack_u8Fixed8Number(curvetypebuffer[12:14])
+            else:
+                # Curve is a 1D curve of 16 bit integer entries
+                self._curvetype = "1D Curve"
+
+                integerarray = numpy.frombuffer(
+                    curvetypebuffer,
+                    dtype=numpy.uint16,
+                    count=self._entriescount,
+                    offset=12
+                )
+
+                self._curve = numpy.divide(integerarray, (2**16 - 1))
+                print(integerarray[self._entriescount - 1])
+
+        except Exception as e:
+            print(e)
+            raise ICCFileError("problem loading curvType")
+
+    def __str__(self):
+        return "[\"{}\", {}, \"{}\", {}, {}]".format(
+            self._typesignature,
+            self._reserved,
+            self._curvetype,
+            self._entriescount,
+            self._curve
+        )
+
+
+# # rTRCType, identifier "rTRC"
+# class rTRCType(iccProfileElement):
+#     def __init__(self, offset, length, buffer):
+#         super(rTRCType, self).__init__(offset, length)
+#         self._typesignature = None
+#         self._reserved = None
+#         self._entriescount = None
+#         self._curve = None
+#         self._curvetype = None
+#         self.read(buffer)
+
+#     @property
+#     def value(self):
+#         return self._curve
+
+#     def read(self, buffer):
+#         try:
+#             curvetypebuffer = buffer[self._slice]
+#             self._typesignature = unpack_tagSignature(curvetypebuffer[0:4])
+#             self._reserved = unpack_uInt32Number(curvetypebuffer[4:8])
+#             self._entriescount = unpack_uInt32Number(curvetypebuffer[8:12])
+
+#             if self._entriescount == 0:
+#                 # Curve type is an identity
+#                 self._curvetype = "Identity Curve"
+#             elif self._entriescount == 1:
+#                 # Curve type is a pure power function
+#                 self._curvetype = "Power Function"
+#                 self._curve = unpack_u8Fixed8Number(curvetypebuffer[12:14])
+#             else:
+#                 # Curve is a 1D curve of 16 bit integer entries
+#                 self._curvetype = "1D Curve"
+#                 self._curve = numpy.empty(
+#                     self._entriescount, dtype=numpy.int16)
+
+#                 for count in range(self._entriescount):
+#                     self._curve[count] = unpack_uInt16Number()
+
+#                     start = count + 12
+#                     stop = ((count + 1) * 2) + 12
+#                     self._curve[count].read(curvetypebuffer[start:stop])
+
+#         except Exception:
+#             raise ICCFileError("problem loading rTRCType")
+
+#     def __str__(self):
+#         return "[\"{}\", {}, \"{}\", {}]".format(
+#             self._typesignature,
+#             self._reserved,
+#             self._curvetype,
+#             self._entriescount
+#         )
 
 
 # textDescriptionType, identifier "desc"
@@ -1030,6 +1153,7 @@ class iccTag(iccProfileElement):
                 )
 
                 signaturetype = signaturetype.replace(" ", "_")
+                print(signaturetype)
 
                 signatureclass = getattr(
                     sys.modules[__name__],

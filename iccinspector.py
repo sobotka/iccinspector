@@ -61,6 +61,59 @@ _renderingintenttable = {
     3: "ICC-absolute colorimetric"
 }
 
+_parametriccurvetypetable = {
+    0: {
+            "function": "Y = X**g",
+            "fieldlength": 4,
+            "parameters": {
+                "g": None
+            }
+    },
+    1: {
+            "function": "Y = (aX + b)**g if X >= -b/a else Y = 0",
+            "fieldlength": 12,
+            "parameters": {
+                "g": None,
+                "a": None,
+                "b": None
+            }
+    },
+    2: {
+            "function": "Y = (aX + b)**g + c if X >= -b/a else Y = c",
+            "fieldlength": 16,
+            "parameters": {
+                "g": None,
+                "a": None,
+                "b": None,
+                "c": None
+            }
+    },
+    3: {
+            "function": "Y = (aX + b)**g if X >= d else Y = cX",
+            "fieldlength": 20,
+            "parameters": {
+                "g": None,
+                "a": None,
+                "b": None,
+                "c": None,
+                "d": None
+            }
+    },
+    4: {
+            "function": "Y = (aX + b)**g if X >= d else Y = cX + f",
+            "fieldlength": 28,
+            "parameters": {
+                "g": None,
+                "a": None,
+                "b": None,
+                "c": None,
+                "d": None,
+                "e": None,
+                "f": None
+            }
+    }
+}
+
 
 class ICCFileError(ValueError):
     def __init__(self, message):
@@ -81,8 +134,8 @@ def fs15f16(x):
 
 def unpack_s15Fixed16Number(s):
     """Convert buffer of ICC s15Fixed16 to array of float."""
-    return numpy.divide(
-        numpy.frombuffer(s, numpy.dtype(">i4"), len(s) // 4), 2**16)
+    return as_numeric(numpy.divide(
+        numpy.frombuffer(s, numpy.dtype(">i4"), len(s) // 4), 2**16))
 
 
 def unpack_string(s):
@@ -112,13 +165,8 @@ def unpack_uInt32Number(s):
 
 def unpack_u8Fixed8Number(s):
     """Convert buffer of ICC u8Fixed8Number to array of float."""
-    try:
-        out = numpy.divide(
-            numpy.frombuffer(s, numpy.dtype(">u2"), len(s) // 2), 2**8)
-    except Exception as e:
-        print("here")
-        print(e)
-    return out
+    return as_numeric(numpy.divide(
+            numpy.frombuffer(s, numpy.dtype(">u2"), len(s) // 2), 2**8))
 
 
 class XYZNumber:
@@ -196,8 +244,11 @@ class iccProfileElement:
 # the desc type is defined as descType. The module will automatically
 # parse the function name from iccTag, calling the read() function
 # of the defined type.
+#
+# Identification comment should identify the ICC specified type from
+# the specification, with the relevant four byte tag
 
-# curvType, identifier "curv"
+# curveType, identifier "curv"
 class curvType(iccProfileElement):
     def __init__(self, offset, length, buffer):
         super(curvType, self).__init__(offset, length)
@@ -214,10 +265,10 @@ class curvType(iccProfileElement):
 
     def read(self, buffer):
         try:
-            curvetypebuffer = buffer[self._slice]
-            self._typesignature = unpack_tagSignature(curvetypebuffer[0:4])
-            self._reserved = unpack_uInt32Number(curvetypebuffer[4:8])
-            self._entriescount = unpack_uInt32Number(curvetypebuffer[8:12])
+            curvtypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(curvtypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(curvtypebuffer[4:8])
+            self._entriescount = unpack_uInt32Number(curvtypebuffer[8:12])
 
             if self._entriescount == 0:
                 # Curve type is an identity
@@ -225,20 +276,19 @@ class curvType(iccProfileElement):
             elif self._entriescount == 1:
                 # Curve type is a pure power function
                 self._curvetype = "Power Function"
-                self._curve = unpack_u8Fixed8Number(curvetypebuffer[12:14])
+                self._curve = unpack_u8Fixed8Number(curvtypebuffer[12:14])
             else:
                 # Curve is a 1D curve of 16 bit integer entries
                 self._curvetype = "1D Curve"
 
                 integerarray = numpy.frombuffer(
-                    curvetypebuffer,
+                    curvtypebuffer,
                     dtype=numpy.uint16,
                     count=self._entriescount,
                     offset=12
                 )
 
                 self._curve = numpy.divide(integerarray, (2**16 - 1))
-                print(integerarray[self._entriescount - 1])
 
         except Exception as e:
             raise ICCFileError("problem loading curvType")
@@ -253,29 +303,52 @@ class curvType(iccProfileElement):
         )
 
 
+# parametricCurveType, identifier "para"
 class paraType(iccProfileElement):
     def __init__(self, offset, length, buffer):
         super(paraType, self).__init__(offset, length)
         self._typesignature = None
         self._reserved = None
-        self._description = None
+        self._functiontype = None
+        self._reservedsecond = None
+        self._function = None
+        self._parameters = None
         self.read(buffer)
 
     def read(self, buffer):
         try:
-            texttypebuffer = buffer[self._slice]
-            self._typesignature = unpack_tagSignature(texttypebuffer[0:4])
-            self._reserved = unpack_uInt32Number(texttypebuffer[4:8])
-            self._description = unpack_string(texttypebuffer[8:])
+            paratypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(paratypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(paratypebuffer[4:8])
+            self._functiontype = unpack_uInt16Number(paratypebuffer[8:10])
+            self._reservedsecond = unpack_uInt16Number(paratypebuffer[10:12])
 
-        except Exception:
+            functiontableentry = _parametriccurvetypetable.get(
+                self._functiontype, -1)
+
+            self._function = functiontableentry.get(
+                "function", "Invalid Function")
+            parameters = functiontableentry.get(
+                "parameters", "Invalid Parameters")
+
+            self._parameters = {}
+            for index, parameter in enumerate(parameters):
+                start = (index * 4) + 12
+                end = start + 4
+                self._parameters[parameter] = \
+                    unpack_s15Fixed16Number(paratypebuffer[start:end])
+
+        except Exception as e:
             raise ICCFileError("problem loading paraType")
 
     def __str__(self):
-        return "[\"{}\", {}, \"{}\"]".format(
+        return "[\"{}\", {}, {}, {}, \"{}\", {}]".format(
             self._typesignature,
             self._reserved,
-            self._description
+            self._functiontype,
+            self._reservedsecond,
+            self._function,
+            self._parameters
         )
 
 

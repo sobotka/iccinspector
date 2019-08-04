@@ -263,6 +263,10 @@ class curvType(iccProfileElement):
     def value(self):
         return self._curve
 
+    @property
+    def curvetype(self):
+        return self._curvetype
+
     def read(self, buffer):
         try:
             curvtypebuffer = buffer[self._slice]
@@ -314,6 +318,14 @@ class paraType(iccProfileElement):
         self._function = None
         self._parameters = None
         self.read(buffer)
+
+    @property
+    def value(self):
+        return self._function
+
+    @property
+    def parameters(self):
+        return self._parameters
 
     def read(self, buffer):
         try:

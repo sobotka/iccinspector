@@ -790,7 +790,9 @@ class iccDateTimeNumber(iccProfileElement):
                 unpack_uInt16Number(datetimebuffer[8:10]),
                 unpack_uInt16Number(datetimebuffer[10:12])
             )
-
+        except ValueError as error:
+            print("iccDateTimeNumber Exception: {}".format(error))
+            pass
         except Exception:
             raise ICCFileError("file doesn't appear to have a datetime number")
 

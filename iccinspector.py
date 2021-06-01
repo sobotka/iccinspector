@@ -138,14 +138,9 @@ def unpack_s15Fixed16Number(s):
         numpy.frombuffer(s, numpy.dtype(">i4"), len(s) // 4), 2**16))
 
 
-def unpack_string(s):
+def unpack_string(s, codec="utf-8"):
     """Convert sequence of n bytes into a string"""
-    return struct.unpack("{}s".format(len(s)), s)[0].decode("utf-8")
-
-
-def unpack_unicodeString(s):
-    """Convert sequence of utf16 big-endian into a string"""
-    return struct.unpack("{}s".format(len(s)), s)[0].decode("utf-16be")
+    return struct.unpack("{}s".format(len(s)), s)[0].decode(codec)
 
 
 def unpack_tagSignature(s):
@@ -295,7 +290,7 @@ class mlucType(iccProfileElement):
                 country = unpack_string(texttypebuffer[start+2:start+4])
                 size = unpack_uInt32Number(texttypebuffer[start+4:start+8])
                 offset = unpack_uInt32Number(texttypebuffer[start+8:start+12])
-                text = unpack_unicodeString(texttypebuffer[offset:offset+size])
+                text = unpack_string(texttypebuffer[offset:offset+size], codec="utf-16be")
                 self._records.append(mlucRecord(lang, country, text))
 
         except Exception:

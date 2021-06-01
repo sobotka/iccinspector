@@ -358,6 +358,19 @@ class curvType(iccProfileElement):
         except Exception as e:
             raise ICCFileError("problem loading curvType")
 
+    def extract_lut(self, name):
+        lut = ""
+        lut += "Version 1\n"
+        lut += "From 0 1\n"
+        lut += "Length {}\n".format(self._curve.shape[0])
+        lut += "Components 1\n"
+        lut += "{\n"
+        lut += "\n".join(["  {:.5f}".format(v) for v in self._curve])
+        lut += "\n}"
+
+        with open(name + ".spi1d", "w") as f:
+            f.write(lut)
+
     def __str__(self):
         return "[\"{}\", {}, \"{}\", {}, {}]".format(
             self._typesignature,
@@ -1418,6 +1431,12 @@ if __name__ == "__main__":
             action="append",
             help="specify tag signature to be inspected"
         )
+        parser.add_argument(
+            "-e",
+            dest="extract_lut",
+            action="store_true",
+            help="extract lut from their respective tags"
+        )
         args = parser.parse_args()
 
         numpy.set_printoptions(15)
@@ -1436,6 +1455,13 @@ if __name__ == "__main__":
             #             tagsignature)
             #         ]
             #     )
+
+        if args.extract_lut:
+            for (signature, tag) in testField.tags:
+                try:
+                    tag.type.extract_lut(signature)
+                except Exception:
+                    continue
 
     except ICCFileError as e:
         print("Error loading ICC / ICM file: {}".format(e))

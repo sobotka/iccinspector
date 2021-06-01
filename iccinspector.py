@@ -348,14 +348,12 @@ class curvType(iccProfileElement):
                 # Curve is a 1D curve of 16 bit integer entries
                 self._curvetype = "1D Curve"
 
-                integerarray = numpy.frombuffer(
+                self._curve = numpy.frombuffer(
                     curvtypebuffer,
-                    dtype=numpy.uint16,
+                    dtype=">u2",
                     count=self._entriescount,
                     offset=12
-                )
-
-                self._curve = numpy.divide(integerarray, (2**16 - 1))
+                ) / (2**16 - 1)
 
         except Exception as e:
             raise ICCFileError("problem loading curvType")

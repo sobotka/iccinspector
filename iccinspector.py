@@ -143,6 +143,11 @@ def unpack_string(s):
     return struct.unpack("{}s".format(len(s)), s)[0].decode("utf-8")
 
 
+def unpack_unicodeString(s):
+    """Convert sequence of utf16 big-endian into a string"""
+    return struct.unpack("{}s".format(len(s)), s)[0].decode("utf-16be")
+
+
 def unpack_tagSignature(s):
     """Convert sequence of 4 bytes into a string."""
     return struct.unpack("4s", s)[0].decode("utf-8")
@@ -237,7 +242,7 @@ class iccProfileElement:
         )
 
 
-# All ICC types ar defined below, based off of the iccProfileElement.
+# All ICC types are defined below, based off of the iccProfileElement.
 # To add an unsupported type, simply define a new class based off
 # of iccProfileElement with the four letter tag signature as the
 # first four letters of the class, followed by "Type". For example,
@@ -247,6 +252,64 @@ class iccProfileElement:
 #
 # Identification comment should identify the ICC specified type from
 # the specification, with the relevant four byte tag
+
+
+class mlucRecord(object):
+    def __init__(self, lang, country, text):
+        self._lang = lang
+        self._country = country
+        self._text = text
+
+    def __str__(self):
+        return "[{}, {}, {}]".format(
+            self._lang,
+            self._country,
+            self._text
+        )
+
+# multiLocalizedUnicodeType, identifier "mluc"
+class mlucType(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(mlucType, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._recordcount = None
+        self._recordsize = None
+        self._records = None
+        self._description = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            texttypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(texttypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(texttypebuffer[4:8])
+            self._recordcount = unpack_uInt32Number(texttypebuffer[8:12])
+            self._recordsize = unpack_uInt32Number(texttypebuffer[12:16])
+            self._records = []
+
+            for idx in range(self._recordcount):
+                start = 16 + idx * 12
+
+                lang = unpack_string(texttypebuffer[start:start+2])
+                country = unpack_string(texttypebuffer[start+2:start+4])
+                size = unpack_uInt32Number(texttypebuffer[start+4:start+8])
+                offset = unpack_uInt32Number(texttypebuffer[start+8:start+12])
+                text = unpack_unicodeString(texttypebuffer[offset:offset+size])
+                self._records.append(mlucRecord(lang, country, text))
+
+        except Exception:
+            raise ICCFileError("problem loading mlucType")
+
+    def __str__(self):
+        return "[\"{}\", {}, {}, {}, {}]".format(
+            self._typesignature,
+            self._reserved,
+            self._recordcount,
+            self._recordsize,
+            ", ".join([str(r) for r in self._records])
+        )
+
 
 # curveType, identifier "curv"
 class curvType(iccProfileElement):

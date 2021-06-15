@@ -1394,7 +1394,11 @@ class iccProfile:
 
     def read(self, buffer):
         for _, var in vars(self).items():
-            var.read(buffer)
+            try:
+                var.read(buffer)
+            except Exception as e:
+                print("Skip {}: {}".format(type(var).__name__, str(e)))
+                continue
 
     def __str__(self):
         string = ""

@@ -433,6 +433,144 @@ class paraType(iccProfileElement):
         )
 
 
+# cmSigVideoCardGammaType, identifier "vcgt"
+class vcgtTable(object):
+    def __init__(self, channels, entry_count, entry_size, data):
+        self._channels = channels
+        self._entry_count = entry_count
+        self._entry_size = entry_size
+        self._data = data
+
+    def __str__(self):
+        return "[{}, {}, {}, {}]".format(
+            self._channels,
+            self._entry_count,
+            self._entry_size,
+            self._data
+        )
+
+
+# cmVideoCardGammaFormula
+class vcgtFormulaComponent(object):
+    def __init__(self, gamma, min, max):
+        self._gamma = gamma
+        self._min = min
+        self._max = max
+
+    def __str__(self):
+        return "[{}, {}, {}]".format(
+            self._gamma,
+            self._min,
+            self._max
+        )
+
+
+# cmVideoCardGammaTable
+class vcgtFormula(object):
+    def __init__(self, red, green, blue):
+        self._red = red
+        self._green = green
+        self._blue = blue
+
+    def __str__(self):
+        return "[Red: {}, Green: {}, Blue: {}]".format(
+            self._red,
+            self._green,
+            self._blue
+        )
+
+class vcgtType(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(vcgtType, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._gamma_type = None
+        self._gamma = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            vcgttypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(vcgttypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(vcgttypebuffer[4:8])
+            self._gamma_type = unpack_uInt32Number(vcgttypebuffer[8:12])
+
+            if self._gamma_type == 0:
+                # VCGT is table based
+                channels = unpack_uInt16Number(vcgttypebuffer[12:14])
+                entry_count = unpack_uInt16Number(vcgttypebuffer[14:16])
+                entry_size = unpack_uInt16Number(vcgttypebuffer[16:18])
+
+                # Skip if we don't get Fixed representation for now
+                if entry_size != 2:
+                    return
+                data = numpy.frombuffer(
+                    vcgttypebuffer,
+                    dtype=">u2",
+                    count=channels * entry_count,
+                    offset=18
+                ) / (2**16 - 1)
+
+                self._gamma = vcgtTable(channels, entry_count, entry_size, data)
+
+            elif self._gamma_type == 1:
+                # VCGT is formula based
+                red_gamma = unpack_s15Fixed16Number(vcgttypebuffer[12:16])
+                red_min = unpack_s15Fixed16Number(vcgttypebuffer[16:20])
+                red_max = unpack_s15Fixed16Number(vcgttypebuffer[20:24])
+
+                green_gamma = unpack_s15Fixed16Number(vcgttypebuffer[24:28])
+                green_min = unpack_s15Fixed16Number(vcgttypebuffer[28:32])
+                green_max = unpack_s15Fixed16Number(vcgttypebuffer[32:36])
+
+                blue_gamma = unpack_s15Fixed16Number(vcgttypebuffer[36:40])
+                blue_min = unpack_s15Fixed16Number(vcgttypebuffer[40:44])
+                blue_max = unpack_s15Fixed16Number(vcgttypebuffer[44:48])
+
+                self._gamma = vcgtFormula(
+                    vcgtFormulaComponent(red_gamma, red_min, red_max),
+                    vcgtFormulaComponent(green_gamma, green_min, green_max),
+                    vcgtFormulaComponent(blue_gamma, blue_min, blue_max),
+                )
+
+        except Exception as e:
+            raise ICCFileError("problem loading vcgtType: {}".format(str(e)))
+
+    def extract_lut(self, name):
+        # Skip non table based vcgt
+        if self._gamma_type != 0:
+            return
+
+        table = self._gamma
+
+        lut = ""
+        lut += "Version 1\n"
+        lut += "From 0 1\n"
+        lut += "Length {}\n".format(table._entry_count)
+        lut += "Components {}\n".format(table._channels)
+        lut += "{\n"
+        if table._channels == 1:
+            lut += "\n".join(["  {:.5f}".format(v) for v in table._data])
+            lut += "\n"
+        elif table._channels == 3:
+            data = table._data.reshape(-1, 3, order='F')
+            for idx in range(data.shape[0]):
+                lut += "  {:.5f}  {:.5f}  {:.5f}\n".format(
+                    data[idx,0], data[idx,1], data[idx,2])
+        lut += "}"
+
+        with open(name + ".spi1d", "w") as f:
+            f.write(lut)
+
+    def __str__(self):
+        return "[\"{}\", {}, {}, {}]".format(
+            self._typesignature,
+            self._reserved,
+            self._gamma_type,
+            self._gamma,
+        )
+
+
 # textDescriptionType, identifier "desc"
 class descType(iccProfileElement):
     def __init__(self, offset, length, buffer):

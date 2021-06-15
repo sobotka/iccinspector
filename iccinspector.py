@@ -249,6 +249,7 @@ class iccProfileElement:
 # the specification, with the relevant four byte tag
 
 
+# multiLocalizedUnicodeType, identifier "mluc"
 class mlucRecord(object):
     def __init__(self, lang, country, text):
         self._lang = lang
@@ -262,7 +263,6 @@ class mlucRecord(object):
             self._text
         )
 
-# multiLocalizedUnicodeType, identifier "mluc"
 class mlucType(iccProfileElement):
     def __init__(self, offset, length, buffer):
         super(mlucType, self).__init__(offset, length)
@@ -975,8 +975,7 @@ class iccProfileFlags(iccProfileElement):
                 "=4b", profileflagsbuffer[0:4])[0]
 
         except Exception:
-            raise ICCFileError("file doesn't appear to have profile flags"
-                               )
+            raise ICCFileError("file doesn't appear to have profile flags")
 
     def __repr__(self):
         return "<class '{0}({1}, profileflags({2:032b}))'>".format(

@@ -521,7 +521,7 @@ class textType(iccProfileElement):
         return "[\"{}\", {}, \"{}\"]".format(
             self._typesignature,
             self._reserved,
-            self._description
+            textwrap.shorten(self._description, width=256)
         )
 
 
@@ -1433,7 +1433,7 @@ if __name__ == "__main__":
         )
         args = parser.parse_args()
 
-        numpy.set_printoptions(15)
+        numpy.set_printoptions(15, threshold=128)
 
         with args.iccfile as f:
             s = memoryview(f.read())

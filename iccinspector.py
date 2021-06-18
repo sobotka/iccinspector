@@ -140,7 +140,7 @@ def unpack_s15Fixed16Number(s):
 
 def unpack_string(s, codec="utf-8"):
     """Convert sequence of n bytes into a string"""
-    return struct.unpack("{}s".format(len(s)), s)[0].decode(codec)
+    return struct.unpack("{}s".format(len(s)), s)[0].decode(codec, errors='ignore')
 
 
 def unpack_tagSignature(s):

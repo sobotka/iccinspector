@@ -204,8 +204,8 @@ class XYZNumber:
                 self._XYZ[1], XYZ_sum, where=XYZ_sum != 0)
             self._xyY[2] = self._XYZ[1]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile size")
+        except Exception as e:
+            raise ICCFileError("Error parsing profile size: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}(XYZ({1}))'>".format(
@@ -290,11 +290,12 @@ class mlucType(iccProfileElement):
                 country = unpack_string(texttypebuffer[start+2:start+4])
                 size = unpack_uInt32Number(texttypebuffer[start+4:start+8])
                 offset = unpack_uInt32Number(texttypebuffer[start+8:start+12])
-                text = unpack_string(texttypebuffer[offset:offset+size], codec="utf-16be")
+                text = unpack_string(
+                    texttypebuffer[offset:offset+size], codec="utf-16be")
                 self._records.append(mlucRecord(lang, country, text))
 
-        except Exception:
-            raise ICCFileError("problem loading mlucType")
+        except Exception as e:
+            raise ICCFileError("problem loading mlucType: {}".format(str(e)))
 
     def __str__(self):
         return "[\"{}\", {}, {}, {}, {}]".format(
@@ -351,7 +352,7 @@ class curvType(iccProfileElement):
                 ) / (2**16 - 1)
 
         except Exception as e:
-            raise ICCFileError("problem loading curvType")
+            raise ICCFileError("problem loading curvType: {}".format(str(e)))
 
     def extract_lut(self, name):
         lut = ""
@@ -420,7 +421,7 @@ class paraType(iccProfileElement):
                     unpack_s15Fixed16Number(paratypebuffer[start:end])
 
         except Exception as e:
-            raise ICCFileError("problem loading paraType")
+            raise ICCFileError("problem loading paraType: {}".format(str(e)))
 
     def __str__(self):
         return "[\"{}\", {}, {}, {}, \"{}\", {}]".format(
@@ -617,8 +618,8 @@ class descType(iccProfileElement):
                 desctypebuffer[endofunicode + 3:endofunicode + 70]
             )
 
-        except Exception:
-            raise ICCFileError("problem loading descType")
+        except Exception as e:
+            raise ICCFileError("problem loading descType: {}".format(str(e)))
 
     def __str__(self):
         return "[\"{}\", {}, {}, \"{}\", {}, {}, \"{}\", {}, {}, \"{}\"]" \
@@ -652,8 +653,8 @@ class textType(iccProfileElement):
             self._reserved = unpack_uInt32Number(texttypebuffer[4:8])
             self._description = unpack_string(texttypebuffer[8:])
 
-        except Exception:
-            raise ICCFileError("problem loading textType")
+        except Exception as e:
+            raise ICCFileError("problem loading textType: {}".format(str(e)))
 
     def __str__(self):
         return "[\"{}\", {}, \"{}\"]".format(
@@ -691,8 +692,8 @@ class XYZ_Type(iccProfileElement):
                 stop = ((count + 1) * 12) + 8
                 self._XYZ[count].read(xyztypebuffer[start:stop])
 
-        except Exception:
-            raise ICCFileError("problem loading XYZ_Type")
+        except Exception as e:
+            raise ICCFileError("problem loading XYZ_Type: {}".format(str(e)))
 
     def __str__(self):
         xyzstring = ""
@@ -735,8 +736,8 @@ class sf32Type(iccProfileElement):
                 sf32typebuffer[8:self._slice.stop]
             )
 
-        except Exception:
-            raise ICCFileError("problem loading sf32Type")
+        except Exception as e:
+            raise ICCFileError("problem loading sf32Type: {}".format(str(e)))
 
     def __str__(self):
         sf32string = ""
@@ -767,8 +768,8 @@ class iccProfileSize(iccProfileElement):
             profilesizebuffer = buffer[self._slice]
             self._profilesize = unpack_uInt32Number(profilesizebuffer)
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile size")
+        except Exception as e:
+            raise ICCFileError("Error parsing profile size: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profilesize({2}))'>".format(
@@ -794,9 +795,9 @@ class iccPreferredCMMType(iccProfileElement):
             self._preferredcmmtype = unpack_tagSignature(
                 preferredcmmtypebuffer)
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a prefered CMM "
-                               "type")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing prefered CMMtype: {}".format(str(e)))
 
     @property
     def preferredcmmtype(self):
@@ -831,9 +832,9 @@ class iccProfileVersion(iccProfileElement):
                 0b00001111
             self._reserved = struct.unpack("H", versionbuffer[2:4])[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile version "
-                               )
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile version: {}".format(str(e)))
 
     @property
     def majorVersion(self):
@@ -877,9 +878,9 @@ class iccProfileDeviceClass(iccProfileElement):
             self._profiledeviceclassdescription = \
                 _profileclasssignatures.get(self._profiledeviceclass, "None")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile / "
-                               "device class")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile / device class: {}".format(str(e)))
 
     @property
     def profiledeviceclass(self):
@@ -918,8 +919,9 @@ class iccDataColorSpace(iccProfileElement):
             self._datacolorspacedescription = \
                 _colorspacesignatures.get(self._datacolorspace, "None")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a data colorspace")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing data colorspace: {}".format(str(e)))
 
     @property
     def datacolorspace(self):
@@ -956,8 +958,8 @@ class iccPCS(iccProfileElement):
             self._pcs = unpack_tagSignature(pcsbuffer[0:4])
             self._pcsdescription = _colorspacesignatures.get(self._pcs, "None")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a PCS")
+        except Exception as e:
+            raise ICCFileError("Error parsing PCS: {}".format(str(e)))
 
     @property
     def pcs(self):
@@ -1000,8 +1002,9 @@ class iccDateTimeNumber(iccProfileElement):
         except ValueError as error:
             print("iccDateTimeNumber Exception: {}".format(error))
             pass
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a datetime number")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing datetime number: {}".format(str(e)))
 
     @property
     def datetime(self):
@@ -1038,9 +1041,9 @@ class iccProfileFileSignature(iccProfileElement):
             if self._profilefilesignature != "acsp":
                 raise ICCFileError("file doesn't appear to be an ICC / ICM")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile file "
-                               "signature")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile file signature: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profilefilesignature({2}))'>".format(
@@ -1077,10 +1080,9 @@ class iccPrimaryPlatform(iccProfileElement):
             self._primaryplatformdescription = \
                 _primaryplatformsignatures.get(self._primaryplatform, "None")
 
-        except Exception:
+        except Exception as e:
             raise ICCFileError(
-                "file doesn't appear to have a primary platform"
-            )
+                "Error parsing primary platform: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, primaryplatform('{2}', '{3}'))'>".format(
@@ -1112,8 +1114,9 @@ class iccProfileFlags(iccProfileElement):
             self._profileflags = struct.unpack(
                 "=4b", profileflagsbuffer[0:4])[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have profile flags")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile flags: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profileflags({2:032b}))'>".format(
@@ -1143,9 +1146,9 @@ class iccDeviceManufacturer(iccProfileElement):
             self._devicemanufacturer = unpack_tagSignature(
                 devicemanufacturerbuffer[0:4])
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a device "
-                               "manufacturer")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing device manufacturer: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, devicemanufacturer('{2}'))'>".format(
@@ -1174,8 +1177,8 @@ class iccDeviceModel(iccProfileElement):
             devicemodelbuffer = buffer[self._slice]
             self._devicemodel = unpack_tagSignature(devicemodelbuffer[0:4])
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a device model")
+        except Exception as e:
+            raise ICCFileError("Error parsing device model: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, devicemodel('{2}'))'>".format(
@@ -1205,10 +1208,9 @@ class iccDeviceAttributes(iccProfileElement):
             self._deviceattributes = struct.unpack(
                 "=8b", deviceattributesbuffer[0:8])[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have device "
-                               "attributes flags"
-                               )
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing device attributes flags: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, deviceattributesflags({2:064b}))'>".format(
@@ -1245,9 +1247,9 @@ class iccRenderingIntent(iccProfileElement):
             self._renderingintentdescription = \
                 _renderingintenttable[self._renderingintent]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a rendering intent"
-                               )
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing rendering intent: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, renderingintent({2}, '{3}'))'>".format(
@@ -1278,9 +1280,9 @@ class iccPCSIlluminant(iccProfileElement):
             pcsilluminantxyzbuffer = buffer[self._slice]
             self._pcsilluminant.read(pcsilluminantxyzbuffer)
 
-        except Exception:
+        except Exception as e:
             raise ICCFileError(
-                "file doesn't appear to have a rendering intent")
+                "Error parsing PCS illuminant: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, pcsilluminant({2}))'>".format(
@@ -1309,8 +1311,9 @@ class iccProfileCreator(iccProfileElement):
             self._profilecreator = unpack_tagSignature(
                 profilecreatorbuffer[0:4])
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile creator")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile creator: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profilecreator('{2}'))'>".format(
@@ -1341,8 +1344,8 @@ class iccProfileID(iccProfileElement):
             self._profileid = struct.unpack(
                 "{0}s".format(count), profileidbuffer)[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile ID")
+        except Exception as e:
+            raise ICCFileError("Error parsing profile ID: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profileid('{2}'))'>".format(
@@ -1369,8 +1372,9 @@ class iccReserved(iccProfileElement):
             self._reserved = struct.unpack(
                 "{0}s".format(count), reservedbuffer)[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a reserved field")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing reserved field: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, reserved('{2}'))'>".format(
@@ -1430,8 +1434,9 @@ class iccTag(iccProfileElement):
             except AttributeError:
                 pass
 
-        except Exception:
-            raise ICCFileError("error while reading tag signature")
+        except Exception as e:
+            raise ICCFileError(
+                "Error reading tag signature: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, tag('{2}'))'>".format(
@@ -1476,8 +1481,8 @@ class iccTagTable(iccProfileElement):
                 tag.read(buffer)
                 self._tags[count] = (tag.signature, tag)
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a tag table")
+        except Exception as e:
+            raise ICCFileError("Error parsing tag table: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, tagtable('{2}'))'>".format(

@@ -1,0 +1,15 @@
+appdirs==1.4.4
+cfgv==3.3.0
+DateTime==4.3
+distlib==0.3.2
+filelock==3.0.12
+identify==2.2.10
+nodeenv==1.6.0
+numpy==1.21.0
+pre-commit==2.13.0
+pytz==2021.1
+PyYAML==5.4.1
+six==1.16.0
+toml==0.10.2
+virtualenv==20.4.7
+zope.interface==5.4.0

@@ -263,6 +263,7 @@ class mlucRecord(object):
             self._text
         )
 
+
 class mlucType(iccProfileElement):
     def __init__(self, offset, length, buffer):
         super(mlucType, self).__init__(offset, length)

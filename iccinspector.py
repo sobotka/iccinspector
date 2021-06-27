@@ -34,7 +34,7 @@ _colorspacesignatures = {
     "CCLR": "12 colour",
     "DCLR": "13 colour",
     "ECLR": "14 colour",
-    "FCLR": "15 colour"
+    "FCLR": "15 colour",
 }
 
 _profileclasssignatures = {
@@ -44,74 +44,53 @@ _profileclasssignatures = {
     "link": "DeviceLink profile",
     "spac": "ColorSpace profile",
     "abst": "Abstract profile",
-    "nmcl": "NamedColor profile"
+    "nmcl": "NamedColor profile",
 }
 
 _primaryplatformsignatures = {
     "APPL": "Apple Computer, Inc.",
     "MSFT": "Microsoft Corporation",
     "SGI ": "Silicon Graphics, Inc.",
-    "SUNW": "Sun Microsystems, Inc."
+    "SUNW": "Sun Microsystems, Inc.",
 }
 
 _renderingintenttable = {
     0: "Perceptual",
     1: "Media-relative colorimetric",
     2: "Saturation",
-    3: "ICC-absolute colorimetric"
+    3: "ICC-absolute colorimetric",
 }
 
 _parametriccurvetypetable = {
-    0: {
-            "function": "Y = X**g",
-            "fieldlength": 4,
-            "parameters": {
-                "g": None
-            }
-    },
+    0: {"function": "Y = X**g", "fieldlength": 4, "parameters": {"g": None}},
     1: {
-            "function": "Y = (aX + b)**g if X >= -b/a else Y = 0",
-            "fieldlength": 12,
-            "parameters": {
-                "g": None,
-                "a": None,
-                "b": None
-            }
+        "function": "Y = (aX + b)**g if X >= -b/a else Y = 0",
+        "fieldlength": 12,
+        "parameters": {"g": None, "a": None, "b": None},
     },
     2: {
-            "function": "Y = (aX + b)**g + c if X >= -b/a else Y = c",
-            "fieldlength": 16,
-            "parameters": {
-                "g": None,
-                "a": None,
-                "b": None,
-                "c": None
-            }
+        "function": "Y = (aX + b)**g + c if X >= -b/a else Y = c",
+        "fieldlength": 16,
+        "parameters": {"g": None, "a": None, "b": None, "c": None},
     },
     3: {
-            "function": "Y = (aX + b)**g if X >= d else Y = cX",
-            "fieldlength": 20,
-            "parameters": {
-                "g": None,
-                "a": None,
-                "b": None,
-                "c": None,
-                "d": None
-            }
+        "function": "Y = (aX + b)**g if X >= d else Y = cX",
+        "fieldlength": 20,
+        "parameters": {"g": None, "a": None, "b": None, "c": None, "d": None},
     },
     4: {
-            "function": "Y = (aX + b)**g if X >= d else Y = cX + f",
-            "fieldlength": 28,
-            "parameters": {
-                "g": None,
-                "a": None,
-                "b": None,
-                "c": None,
-                "d": None,
-                "e": None,
-                "f": None
-            }
-    }
+        "function": "Y = (aX + b)**g if X >= d else Y = cX + f",
+        "fieldlength": 28,
+        "parameters": {
+            "g": None,
+            "a": None,
+            "b": None,
+            "c": None,
+            "d": None,
+            "e": None,
+            "f": None,
+        },
+    },
 }
 
 
@@ -129,18 +108,23 @@ def as_numeric(obj, as_type=numpy.float64):
 
 def fs15f16(x):
     """Convert float to ICC s15Fixed16Number (as a Python ``int``)."""
-    return int(round(x * 2**16))
+    return int(round(x * 2 ** 16))
 
 
 def unpack_s15Fixed16Number(s):
     """Convert buffer of ICC s15Fixed16 to array of float."""
-    return as_numeric(numpy.divide(
-        numpy.frombuffer(s, numpy.dtype(">i4"), len(s) // 4), 2**16))
+    return as_numeric(
+        numpy.divide(
+            numpy.frombuffer(s, numpy.dtype(">i4"), len(s) // 4), 2 ** 16
+        )
+    )
 
 
 def unpack_string(s, codec="utf-8"):
     """Convert sequence of n bytes into a string"""
-    return struct.unpack("{}s".format(len(s)), s)[0].decode(codec, errors='ignore')
+    return struct.unpack("{}s".format(len(s)), s)[0].decode(
+        codec, errors="ignore"
+    )
 
 
 def unpack_tagSignature(s):
@@ -165,14 +149,17 @@ def unpack_uInt32Number(s):
 
 def unpack_u8Fixed8Number(s):
     """Convert buffer of ICC u8Fixed8Number to array of float."""
-    return as_numeric(numpy.divide(
-            numpy.frombuffer(s, numpy.dtype(">u2"), len(s) // 2), 2**8))
+    return as_numeric(
+        numpy.divide(
+            numpy.frombuffer(s, numpy.dtype(">u2"), len(s) // 2), 2 ** 8
+        )
+    )
 
 
 class XYZNumber:
     def __init__(self):
-        self._XYZ = numpy.array([0., 0., 0.])
-        self._xyY = numpy.array([0., 0., 0.])
+        self._XYZ = numpy.array([0.0, 0.0, 0.0])
+        self._xyY = numpy.array([0.0, 0.0, 0.0])
 
     @property
     def XYZ(self):
@@ -199,9 +186,11 @@ class XYZNumber:
             self._XYZ = unpack_s15Fixed16Number(buffer)
             XYZ_sum = numpy.sum(self._XYZ)
             self._xyY[0] = numpy.divide(
-                self._XYZ[0], XYZ_sum, where=XYZ_sum != 0)
+                self._XYZ[0], XYZ_sum, where=XYZ_sum != 0
+            )
             self._xyY[1] = numpy.divide(
-                self._XYZ[1], XYZ_sum, where=XYZ_sum != 0)
+                self._XYZ[1], XYZ_sum, where=XYZ_sum != 0
+            )
             self._xyY[2] = self._XYZ[1]
 
         except Exception as e:
@@ -209,7 +198,8 @@ class XYZNumber:
 
     def __repr__(self):
         return "<class '{0}(XYZ({1}))'>".format(
-            self.__class__.__name__, self._XYZ)
+            self.__class__.__name__, self._XYZ
+        )
 
     def __str__(self):
         return "[X: {} Y: {} Z: {}][x: {} y: {} Y: {}]".format(
@@ -218,7 +208,7 @@ class XYZNumber:
             "{:<.15f}".format(self._XYZ[2]),
             "{:<.15f}{}".format(self._xyY[0], ","),
             "{:<.15f}{}".format(self._xyY[1], ","),
-            "{:<.15f}".format(self._xyY[2])
+            "{:<.15f}".format(self._xyY[2]),
         )
 
 
@@ -257,11 +247,7 @@ class mlucRecord(object):
         self._text = text
 
     def __str__(self):
-        return "[{}, {}, {}]".format(
-            self._lang,
-            self._country,
-            self._text
-        )
+        return "[{}, {}, {}]".format(self._lang, self._country, self._text)
 
 
 class mlucType(iccProfileElement):
@@ -287,24 +273,29 @@ class mlucType(iccProfileElement):
             for idx in range(self._recordcount):
                 start = 16 + idx * 12
 
-                lang = unpack_string(texttypebuffer[start:start+2])
-                country = unpack_string(texttypebuffer[start+2:start+4])
-                size = unpack_uInt32Number(texttypebuffer[start+4:start+8])
-                offset = unpack_uInt32Number(texttypebuffer[start+8:start+12])
+                lang = unpack_string(texttypebuffer[start : start + 2])
+                country = unpack_string(texttypebuffer[start + 2 : start + 4])
+                size = unpack_uInt32Number(
+                    texttypebuffer[start + 4 : start + 8]
+                )
+                offset = unpack_uInt32Number(
+                    texttypebuffer[start + 8 : start + 12]
+                )
                 text = unpack_string(
-                    texttypebuffer[offset:offset+size], codec="utf-16be")
+                    texttypebuffer[offset : offset + size], codec="utf-16be"
+                )
                 self._records.append(mlucRecord(lang, country, text))
 
         except Exception as e:
             raise ICCFileError("problem loading mlucType: {}".format(str(e)))
 
     def __str__(self):
-        return "[\"{}\", {}, {}, {}, {}]".format(
+        return '["{}", {}, {}, {}, {}]'.format(
             self._typesignature,
             self._reserved,
             self._recordcount,
             self._recordsize,
-            ", ".join([str(r) for r in self._records])
+            ", ".join([str(r) for r in self._records]),
         )
 
 
@@ -345,12 +336,15 @@ class curvType(iccProfileElement):
                 # Curve is a 1D curve of 16 bit integer entries
                 self._curvetype = "1D Curve"
 
-                self._curve = numpy.frombuffer(
-                    curvtypebuffer,
-                    dtype=">u2",
-                    count=self._entriescount,
-                    offset=12
-                ) / (2**16 - 1)
+                self._curve = (
+                    numpy.frombuffer(
+                        curvtypebuffer,
+                        dtype=">u2",
+                        count=self._entriescount,
+                        offset=12,
+                    )
+                    / (2 ** 16 - 1)
+                )
 
         except Exception as e:
             raise ICCFileError("problem loading curvType: {}".format(str(e)))
@@ -369,12 +363,12 @@ class curvType(iccProfileElement):
             f.write(lut)
 
     def __str__(self):
-        return "[\"{}\", {}, \"{}\", {}, {}]".format(
+        return '["{}", {}, "{}", {}, {}]'.format(
             self._typesignature,
             self._reserved,
             self._curvetype,
             self._entriescount,
-            self._curve
+            self._curve,
         )
 
 
@@ -407,31 +401,35 @@ class paraType(iccProfileElement):
             self._reservedsecond = unpack_uInt16Number(paratypebuffer[10:12])
 
             functiontableentry = _parametriccurvetypetable.get(
-                self._functiontype, -1)
+                self._functiontype, -1
+            )
 
             self._function = functiontableentry.get(
-                "function", "Invalid Function")
+                "function", "Invalid Function"
+            )
             parameters = functiontableentry.get(
-                "parameters", "Invalid Parameters")
+                "parameters", "Invalid Parameters"
+            )
 
             self._parameters = {}
             for index, parameter in enumerate(parameters):
                 start = (index * 4) + 12
                 end = start + 4
-                self._parameters[parameter] = \
-                    unpack_s15Fixed16Number(paratypebuffer[start:end])
+                self._parameters[parameter] = unpack_s15Fixed16Number(
+                    paratypebuffer[start:end]
+                )
 
         except Exception as e:
             raise ICCFileError("problem loading paraType: {}".format(str(e)))
 
     def __str__(self):
-        return "[\"{}\", {}, {}, {}, \"{}\", {}]".format(
+        return '["{}", {}, {}, {}, "{}", {}]'.format(
             self._typesignature,
             self._reserved,
             self._functiontype,
             self._reservedsecond,
             self._function,
-            self._parameters
+            self._parameters,
         )
 
 
@@ -445,10 +443,7 @@ class vcgtTable(object):
 
     def __str__(self):
         return "[{}, {}, {}, {}]".format(
-            self._channels,
-            self._entry_count,
-            self._entry_size,
-            self._data
+            self._channels, self._entry_count, self._entry_size, self._data
         )
 
 
@@ -460,11 +455,7 @@ class vcgtFormulaComponent(object):
         self._max = max
 
     def __str__(self):
-        return "[{}, {}, {}]".format(
-            self._gamma,
-            self._min,
-            self._max
-        )
+        return "[{}, {}, {}]".format(self._gamma, self._min, self._max)
 
 
 # cmVideoCardGammaTable
@@ -476,9 +467,7 @@ class vcgtFormula(object):
 
     def __str__(self):
         return "[Red: {}, Green: {}, Blue: {}]".format(
-            self._red,
-            self._green,
-            self._blue
+            self._red, self._green, self._blue
         )
 
 
@@ -507,14 +496,19 @@ class vcgtType(iccProfileElement):
                 # Skip if we don't get Fixed representation for now
                 if entry_size != 2:
                     return
-                data = numpy.frombuffer(
-                    vcgttypebuffer,
-                    dtype=">u2",
-                    count=channels * entry_count,
-                    offset=18
-                ) / (2**16 - 1)
+                data = (
+                    numpy.frombuffer(
+                        vcgttypebuffer,
+                        dtype=">u2",
+                        count=channels * entry_count,
+                        offset=18,
+                    )
+                    / (2 ** 16 - 1)
+                )
 
-                self._gamma = vcgtTable(channels, entry_count, entry_size, data)
+                self._gamma = vcgtTable(
+                    channels, entry_count, entry_size, data
+                )
 
             elif self._gamma_type == 1:
                 # VCGT is formula based
@@ -556,17 +550,18 @@ class vcgtType(iccProfileElement):
             lut += "\n".join(["  {:.5f}".format(v) for v in table._data])
             lut += "\n"
         elif table._channels == 3:
-            data = table._data.reshape(-1, 3, order='F')
+            data = table._data.reshape(-1, 3, order="F")
             for idx in range(data.shape[0]):
                 lut += "  {:.5f}  {:.5f}  {:.5f}\n".format(
-                    data[idx, 0], data[idx, 1], data[idx, 2])
+                    data[idx, 0], data[idx, 1], data[idx, 2]
+                )
         lut += "}"
 
         with open(name + ".spi1d", "w") as f:
             f.write(lut)
 
     def __str__(self):
-        return "[\"{}\", {}, {}, {}]".format(
+        return '["{}", {}, {}, {}]'.format(
             self._typesignature,
             self._reserved,
             self._gamma_type,
@@ -601,42 +596,41 @@ class descType(iccProfileElement):
                 desctypebuffer[12:endofascii]
             )
             self._unicodecode = unpack_uInt32Number(
-                desctypebuffer[endofascii:endofascii + 4]
+                desctypebuffer[endofascii : endofascii + 4]
             )
             self._unicodecount = unpack_uInt32Number(
-                desctypebuffer[endofascii + 4:endofascii + 8]
+                desctypebuffer[endofascii + 4 : endofascii + 8]
             )
             endofunicode = endofascii + self._unicodecount + 8
             self._unicodedescription = unpack_string(
-                desctypebuffer[endofascii + 8:endofunicode]
+                desctypebuffer[endofascii + 8 : endofunicode]
             )
             self._scriptcodecode = unpack_uInt16Number(
-                desctypebuffer[endofunicode:endofunicode + 2]
+                desctypebuffer[endofunicode : endofunicode + 2]
             )
             self._scriptcodecount = unpack_uInt8Number(
-                desctypebuffer[endofunicode + 2:endofunicode + 3]
+                desctypebuffer[endofunicode + 2 : endofunicode + 3]
             )
             self._scriptcodedescription = unpack_string(
-                desctypebuffer[endofunicode + 3:endofunicode + 70]
+                desctypebuffer[endofunicode + 3 : endofunicode + 70]
             )
 
         except Exception as e:
             raise ICCFileError("problem loading descType: {}".format(str(e)))
 
     def __str__(self):
-        return "[\"{}\", {}, {}, \"{}\", {}, {}, \"{}\", {}, {}, \"{}\"]" \
-            .format(
-                self._typesignature,
-                self._reserved,
-                self._asciicount,
-                self._asciidescription,
-                self._unicodecode,
-                self._unicodecount,
-                self._unicodedescription,
-                self._scriptcodecode,
-                self._scriptcodecount,
-                self._scriptcodedescription
-            )
+        return '["{}", {}, {}, "{}", {}, {}, "{}", {}, {}, "{}"]'.format(
+            self._typesignature,
+            self._reserved,
+            self._asciicount,
+            self._asciidescription,
+            self._unicodecode,
+            self._unicodecount,
+            self._unicodedescription,
+            self._scriptcodecode,
+            self._scriptcodecount,
+            self._scriptcodedescription,
+        )
 
 
 # textType, identifier "text"
@@ -659,10 +653,10 @@ class textType(iccProfileElement):
             raise ICCFileError("problem loading textType: {}".format(str(e)))
 
     def __str__(self):
-        return "[\"{}\", {}, \"{}\"]".format(
+        return '["{}", {}, "{}"]'.format(
             self._typesignature,
             self._reserved,
-            textwrap.shorten(self._description, width=256)
+            textwrap.shorten(self._description, width=256),
         )
 
 
@@ -703,14 +697,9 @@ class XYZ_Type(iccProfileElement):
             if index[0] == 0:
                 xyzstring += str(xyznumber)
             else:
-                xyzstring += "\n{:35}{:<}".format(
-                    "",
-                    str(xyznumber)
-                )
-        return "[\"{}\", {}, {}]".format(
-            self._typesignature,
-            self._reserved,
-            xyzstring
+                xyzstring += "\n{:35}{:<}".format("", str(xyznumber))
+        return '["{}", {}, {}]'.format(
+            self._typesignature, self._reserved, xyzstring
         )
 
 
@@ -732,10 +721,10 @@ class sf32Type(iccProfileElement):
             self._typesignature = unpack_tagSignature(sf32typebuffer[0:4])
             self._reserved = unpack_uInt32Number(sf32typebuffer[4:8])
 
-            sf32count = (self._slice.stop - self._slice.start - 8) // 4
+            # sf32count = (self._slice.stop - self._slice.start - 8) // 4
 
             self._sf32 = unpack_s15Fixed16Number(
-                sf32typebuffer[8:self._slice.stop]
+                sf32typebuffer[8 : self._slice.stop]
             )
 
         except Exception as e:
@@ -749,10 +738,8 @@ class sf32Type(iccProfileElement):
             else:
                 sf32string += ", {:<.15f}".format(sf32number)
         sf32string += "]"
-        return "[\"{}\", {}, {}]".format(
-            self._typesignature,
-            self._reserved,
-            sf32string
+        return '["{}", {}, {}]'.format(
+            self._typesignature, self._reserved, sf32string
         )
 
 
@@ -780,9 +767,7 @@ class iccProfileSize(iccProfileElement):
 
     def __str__(self):
         return "{:>30}{:5}{:<15}".format(
-            "Profile Size:",
-            "",
-            str(self._profilesize)
+            "Profile Size:", "", str(self._profilesize)
         )
 
 
@@ -795,11 +780,13 @@ class iccPreferredCMMType(iccProfileElement):
         try:
             preferredcmmtypebuffer = buffer[self._slice]
             self._preferredcmmtype = unpack_tagSignature(
-                preferredcmmtypebuffer)
+                preferredcmmtypebuffer
+            )
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing prefered CMMtype: {}".format(str(e)))
+                "Error parsing prefered CMMtype: {}".format(str(e))
+            )
 
     @property
     def preferredcmmtype(self):
@@ -811,10 +798,8 @@ class iccPreferredCMMType(iccProfileElement):
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\"".format(
-            "Preferred CMM Type:",
-            "",
-            str(self._preferredcmmtype)
+        return '{:>30}{:5}"{:<}"'.format(
+            "Preferred CMM Type:", "", str(self._preferredcmmtype)
         )
 
 
@@ -830,13 +815,15 @@ class iccProfileVersion(iccProfileElement):
             versionbuffer = buffer[self._slice]
             self._majorVersion = struct.unpack("b", versionbuffer[0:1])[0]
             self._minorVersion = struct.unpack("b", versionbuffer[1:2])[0] >> 4
-            self._bugFixVersion = struct.unpack("b", versionbuffer[1:2])[0] & \
-                0b00001111
+            self._bugFixVersion = (
+                struct.unpack("b", versionbuffer[1:2])[0] & 0b00001111
+            )
             self._reserved = struct.unpack("H", versionbuffer[2:4])[0]
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing profile version: {}".format(str(e)))
+                "Error parsing profile version: {}".format(str(e))
+            )
 
     @property
     def majorVersion(self):
@@ -852,8 +839,11 @@ class iccProfileVersion(iccProfileElement):
 
     def __repr__(self):
         return "<class '{0}({1}, version({2}.{3}.{4}))'>".format(
-            self.__class__.__name__, self._slice, self._majorVersion,
-            self._minorVersion, self._bugFixVersion
+            self.__class__.__name__,
+            self._slice,
+            self._majorVersion,
+            self._minorVersion,
+            self._bugFixVersion,
         )
 
     def __str__(self):
@@ -862,7 +852,7 @@ class iccProfileVersion(iccProfileElement):
             "",
             str(self._majorVersion),
             str(self._minorVersion),
-            str(self._bugFixVersion)
+            str(self._bugFixVersion),
         )
 
 
@@ -876,13 +866,16 @@ class iccProfileDeviceClass(iccProfileElement):
         try:
             profiledeviceclassbuffer = buffer[self._slice]
             self._profiledeviceclass = unpack_tagSignature(
-                profiledeviceclassbuffer[0:4])
-            self._profiledeviceclassdescription = \
-                _profileclasssignatures.get(self._profiledeviceclass, "None")
+                profiledeviceclassbuffer[0:4]
+            )
+            self._profiledeviceclassdescription = _profileclasssignatures.get(
+                self._profiledeviceclass, "None"
+            )
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing profile / device class: {}".format(str(e)))
+                "Error parsing profile / device class: {}".format(str(e))
+            )
 
     @property
     def profiledeviceclass(self):
@@ -894,16 +887,18 @@ class iccProfileDeviceClass(iccProfileElement):
 
     def __repr__(self):
         return "<class '{0}({1}, profiledeviceclass('{2}', '{3}'))'>".format(
-            self.__class__.__name__, self._slice, self._profiledeviceclass,
-            self._profiledeviceclassdescription
+            self.__class__.__name__,
+            self._slice,
+            self._profiledeviceclass,
+            self._profiledeviceclassdescription,
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\", \"{}\"".format(
+        return '{:>30}{:5}"{:<}", "{}"'.format(
             "Profile / Device Class:",
             "",
             str(self._profiledeviceclass),
-            str(self._profiledeviceclassdescription)
+            str(self._profiledeviceclassdescription),
         )
 
 
@@ -917,13 +912,16 @@ class iccDataColorSpace(iccProfileElement):
         try:
             datacolorspacebuffer = buffer[self._slice]
             self._datacolorspace = unpack_tagSignature(
-                datacolorspacebuffer[0:4])
-            self._datacolorspacedescription = \
-                _colorspacesignatures.get(self._datacolorspace, "None")
+                datacolorspacebuffer[0:4]
+            )
+            self._datacolorspacedescription = _colorspacesignatures.get(
+                self._datacolorspace, "None"
+            )
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing data colorspace: {}".format(str(e)))
+                "Error parsing data colorspace: {}".format(str(e))
+            )
 
     @property
     def datacolorspace(self):
@@ -935,16 +933,18 @@ class iccDataColorSpace(iccProfileElement):
 
     def __repr__(self):
         return "<class '{0}({1}, datacolorspace('{2}', '{3}'))'>".format(
-            self.__class__.__name__, self._slice, self._datacolorspace,
-            self._datacolorspacedescription
+            self.__class__.__name__,
+            self._slice,
+            self._datacolorspace,
+            self._datacolorspacedescription,
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\", \"{}\"".format(
+        return '{:>30}{:5}"{:<}", "{}"'.format(
             "Profile Data Colorspace:",
             "",
             str(self._datacolorspace),
-            str(self._datacolorspacedescription)
+            str(self._datacolorspacedescription),
         )
 
 
@@ -972,16 +972,16 @@ class iccPCS(iccProfileElement):
         return self._pcsdescription
 
     def __repr__(self):
-        return "<class '{0}({1}, PCS('{2}', '{3}'))'>" .format(
-            self.__class__.__name__, self._slice,
-            self._pcs, self._pcsdescription)
+        return "<class '{0}({1}, PCS('{2}', '{3}'))'>".format(
+            self.__class__.__name__,
+            self._slice,
+            self._pcs,
+            self._pcsdescription,
+        )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\", \"{}\"".format(
-            "Profile PCS:",
-            "",
-            str(self._pcs),
-            str(self._pcsdescription)
+        return '{:>30}{:5}"{:<}", "{}"'.format(
+            "Profile PCS:", "", str(self._pcs), str(self._pcsdescription)
         )
 
 
@@ -999,14 +999,15 @@ class iccDateTimeNumber(iccProfileElement):
                 unpack_uInt16Number(datetimebuffer[4:6]),
                 unpack_uInt16Number(datetimebuffer[6:8]),
                 unpack_uInt16Number(datetimebuffer[8:10]),
-                unpack_uInt16Number(datetimebuffer[10:12])
+                unpack_uInt16Number(datetimebuffer[10:12]),
             )
         except ValueError as error:
             print("iccDateTimeNumber Exception: {}".format(error))
             pass
         except Exception as e:
             raise ICCFileError(
-                "Error parsing datetime number: {}".format(str(e)))
+                "Error parsing datetime number: {}".format(str(e))
+            )
 
     @property
     def datetime(self):
@@ -1019,9 +1020,7 @@ class iccDateTimeNumber(iccProfileElement):
 
     def __str__(self):
         return "{:>30}{:5}{:<}".format(
-            "Date and Time Created:",
-            "",
-            str(self._datetime)
+            "Date and Time Created:", "", str(self._datetime)
         )
 
 
@@ -1038,14 +1037,16 @@ class iccProfileFileSignature(iccProfileElement):
         try:
             profilefilesignaturebuffer = buffer[self._slice]
             self._profilefilesignature = unpack_tagSignature(
-                profilefilesignaturebuffer)
+                profilefilesignaturebuffer
+            )
 
             if self._profilefilesignature != "acsp":
                 raise ICCFileError("file doesn't appear to be an ICC / ICM")
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing profile file signature: {}".format(str(e)))
+                "Error parsing profile file signature: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, profilefilesignature({2}))'>".format(
@@ -1053,10 +1054,8 @@ class iccProfileFileSignature(iccProfileElement):
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\"".format(
-            "Profile File Signature:",
-            "",
-            str(self._profilefilesignature)
+        return '{:>30}{:5}"{:<}"'.format(
+            "Profile File Signature:", "", str(self._profilefilesignature)
         )
 
 
@@ -1078,26 +1077,31 @@ class iccPrimaryPlatform(iccProfileElement):
         try:
             primaryplatformbuffer = buffer[self._slice]
             self._primaryplatform = unpack_tagSignature(
-                primaryplatformbuffer[0:4])
-            self._primaryplatformdescription = \
-                _primaryplatformsignatures.get(self._primaryplatform, "None")
+                primaryplatformbuffer[0:4]
+            )
+            self._primaryplatformdescription = _primaryplatformsignatures.get(
+                self._primaryplatform, "None"
+            )
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing primary platform: {}".format(str(e)))
+                "Error parsing primary platform: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, primaryplatform('{2}', '{3}'))'>".format(
-            self.__class__.__name__, self._slice, self._primaryplatform,
-            self._primaryplatformdescription
+            self.__class__.__name__,
+            self._slice,
+            self._primaryplatform,
+            self._primaryplatformdescription,
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\", \"{}\"".format(
+        return '{:>30}{:5}"{:<}", "{}"'.format(
             "Primary Platform:",
             "",
             str(self._primaryplatform),
-            str(self._primaryplatformdescription)
+            str(self._primaryplatformdescription),
         )
 
 
@@ -1113,12 +1117,14 @@ class iccProfileFlags(iccProfileElement):
     def read(self, buffer):
         try:
             profileflagsbuffer = buffer[self._slice]
-            self._profileflags = struct.unpack(
-                "=4b", profileflagsbuffer[0:4])[0]
+            self._profileflags = struct.unpack("=4b", profileflagsbuffer[0:4])[
+                0
+            ]
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing profile flags: {}".format(str(e)))
+                "Error parsing profile flags: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, profileflags({2:032b}))'>".format(
@@ -1127,9 +1133,7 @@ class iccProfileFlags(iccProfileElement):
 
     def __str__(self):
         return "{:>30}{:5}{:<}".format(
-            "Profile Flags:",
-            "",
-            str(self._profileflags)
+            "Profile Flags:", "", str(self._profileflags)
         )
 
 
@@ -1146,11 +1150,13 @@ class iccDeviceManufacturer(iccProfileElement):
         try:
             devicemanufacturerbuffer = buffer[self._slice]
             self._devicemanufacturer = unpack_tagSignature(
-                devicemanufacturerbuffer[0:4])
+                devicemanufacturerbuffer[0:4]
+            )
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing device manufacturer: {}".format(str(e)))
+                "Error parsing device manufacturer: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, devicemanufacturer('{2}'))'>".format(
@@ -1158,10 +1164,8 @@ class iccDeviceManufacturer(iccProfileElement):
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\"".format(
-            "Device Manufacturer:",
-            "",
-            str(self._devicemanufacturer)
+        return '{:>30}{:5}"{:<}"'.format(
+            "Device Manufacturer:", "", str(self._devicemanufacturer)
         )
 
 
@@ -1188,10 +1192,8 @@ class iccDeviceModel(iccProfileElement):
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\"".format(
-            "Device Model:",
-            "",
-            str(self._devicemodel)
+        return '{:>30}{:5}"{:<}"'.format(
+            "Device Model:", "", str(self._devicemodel)
         )
 
 
@@ -1208,11 +1210,13 @@ class iccDeviceAttributes(iccProfileElement):
         try:
             deviceattributesbuffer = buffer[self._slice]
             self._deviceattributes = struct.unpack(
-                "=8b", deviceattributesbuffer[0:8])[0]
+                "=8b", deviceattributesbuffer[0:8]
+            )[0]
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing device attributes flags: {}".format(str(e)))
+                "Error parsing device attributes flags: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, deviceattributesflags({2:064b}))'>".format(
@@ -1221,9 +1225,7 @@ class iccDeviceAttributes(iccProfileElement):
 
     def __str__(self):
         return "{:>30}{:5}{:<b}".format(
-            "Device Attributes:",
-            "",
-            self._deviceattributes
+            "Device Attributes:", "", self._deviceattributes
         )
 
 
@@ -1245,26 +1247,31 @@ class iccRenderingIntent(iccProfileElement):
         try:
             renderingintentbuffer = buffer[self._slice]
             self._renderingintent = unpack_uInt32Number(
-                renderingintentbuffer[0:4])
-            self._renderingintentdescription = \
-                _renderingintenttable[self._renderingintent]
+                renderingintentbuffer[0:4]
+            )
+            self._renderingintentdescription = _renderingintenttable[
+                self._renderingintent
+            ]
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing rendering intent: {}".format(str(e)))
+                "Error parsing rendering intent: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, renderingintent({2}, '{3}'))'>".format(
-            self.__class__.__name__, self._slice, self._renderingintent,
-            self._renderingintentdescription
+            self.__class__.__name__,
+            self._slice,
+            self._renderingintent,
+            self._renderingintentdescription,
         )
 
     def __str__(self):
-        return "{:>30}{:5}{:<}, \"{}\"".format(
+        return '{:>30}{:5}{:<}, "{}"'.format(
             "Profile PCS:",
             "",
             self._renderingintent,
-            str(self._renderingintentdescription)
+            str(self._renderingintentdescription),
         )
 
 
@@ -1284,17 +1291,17 @@ class iccPCSIlluminant(iccProfileElement):
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing PCS illuminant: {}".format(str(e)))
+                "Error parsing PCS illuminant: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, pcsilluminant({2}))'>".format(
-            self.__class__.__name__, self._slice, repr(self._pcsilluminant))
+            self.__class__.__name__, self._slice, repr(self._pcsilluminant)
+        )
 
     def __str__(self):
         return "{:>30}{:5}{:<}".format(
-            "PCS Illuminant:",
-            "",
-            str(self._pcsilluminant)
+            "PCS Illuminant:", "", str(self._pcsilluminant)
         )
 
 
@@ -1311,11 +1318,13 @@ class iccProfileCreator(iccProfileElement):
         try:
             profilecreatorbuffer = buffer[self._slice]
             self._profilecreator = unpack_tagSignature(
-                profilecreatorbuffer[0:4])
+                profilecreatorbuffer[0:4]
+            )
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing profile creator: {}".format(str(e)))
+                "Error parsing profile creator: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, profilecreator('{2}'))'>".format(
@@ -1323,10 +1332,8 @@ class iccProfileCreator(iccProfileElement):
         )
 
     def __str__(self):
-        return "{:>30}{:5}\"{:<}\"".format(
-            "Profile Creator:",
-            "",
-            str(self._profilecreator)
+        return '{:>30}{:5}"{:<}"'.format(
+            "Profile Creator:", "", str(self._profilecreator)
         )
 
 
@@ -1344,7 +1351,8 @@ class iccProfileID(iccProfileElement):
             profileidbuffer = buffer[self._slice]
             count = len(profileidbuffer)
             self._profileid = struct.unpack(
-                "{0}s".format(count), profileidbuffer)[0]
+                "{0}s".format(count), profileidbuffer
+            )[0]
 
         except Exception as e:
             raise ICCFileError("Error parsing profile ID: {}".format(str(e)))
@@ -1356,9 +1364,7 @@ class iccProfileID(iccProfileElement):
 
     def __str__(self):
         return "{:>30}{:5}{:<}".format(
-            "Profile ID:",
-            "",
-            str(self._profileid.hex())
+            "Profile ID:", "", str(self._profileid.hex())
         )
 
 
@@ -1372,11 +1378,13 @@ class iccReserved(iccProfileElement):
             reservedbuffer = buffer[self._slice]
             count = len(reservedbuffer)
             self._reserved = struct.unpack(
-                "{0}s".format(count), reservedbuffer)[0]
+                "{0}s".format(count), reservedbuffer
+            )[0]
 
         except Exception as e:
             raise ICCFileError(
-                "Error parsing reserved field: {}".format(str(e)))
+                "Error parsing reserved field: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, reserved('{2}'))'>".format(
@@ -1385,9 +1393,7 @@ class iccReserved(iccProfileElement):
 
     def __str__(self):
         return "{:>30}{:5}{:<}".format(
-            "Reserved:",
-            "",
-            str(self._reserved.hex())
+            "Reserved:", "", str(self._reserved.hex())
         )
 
 
@@ -1416,21 +1422,16 @@ class iccTag(iccProfileElement):
 
             try:
                 signaturetype = unpack_tagSignature(
-                    buffer[
-                        self._tagoffset:self._tagoffset + 4
-                    ]
+                    buffer[self._tagoffset : self._tagoffset + 4]
                 )
 
                 signaturetype = signaturetype.replace(" ", "_")
                 signatureclass = getattr(
-                    sys.modules[__name__],
-                    "{}Type".format(signaturetype)
+                    sys.modules[__name__], "{}Type".format(signaturetype)
                 )
 
                 self._type = signatureclass(
-                    self._tagoffset,
-                    self._tagsize,
-                    buffer
+                    self._tagoffset, self._tagsize, buffer
                 )
 
             except AttributeError:
@@ -1438,7 +1439,8 @@ class iccTag(iccProfileElement):
 
         except Exception as e:
             raise ICCFileError(
-                "Error reading tag signature: {}".format(str(e)))
+                "Error reading tag signature: {}".format(str(e))
+            )
 
     def __repr__(self):
         return "<class '{0}({1}, tag('{2}'))'>".format(
@@ -1447,10 +1449,10 @@ class iccTag(iccProfileElement):
 
     def __str__(self):
         return "{} Offset: {} Size: {} {}".format(
-            "{:<8}".format("\"" + str(self._tagsignature) + "\","),
+            "{:<8}".format('"' + str(self._tagsignature) + '",'),
             "{:<8}".format(str(self._tagoffset) + ","),
             "{:<8}".format(str(self._tagsize) + ","),
-            str(self._type)
+            str(self._type),
         )
 
 
@@ -1474,8 +1476,7 @@ class iccTagTable(iccProfileElement):
             self._tagcount = unpack_uInt32Number(tagtablebuffer)
 
             self._tags = numpy.empty(
-                self._tagcount,
-                dtype=[("signature", "U4"), ("tag", object)]
+                self._tagcount, dtype=[("signature", "U4"), ("tag", object)]
             )
 
             for count in range(self._tagcount):
@@ -1497,17 +1498,14 @@ class iccTagTable(iccProfileElement):
             if index[0] == 0:
                 tagstring += str(tag["tag"])
             else:
-                tagstring += "\n{:35}{:<}".format(
-                    "",
-                    str(tag["tag"])
-                )
+                tagstring += "\n{:35}{:<}".format("", str(tag["tag"]))
         return "{:>30}{:5}{:<}\n{:>30}{:5}{:10}".format(
             "Tag Table Count:",
             "",
             str(self._tagcount),
             "Tag Signatures:",
             "",
-            tagstring
+            tagstring,
         )
 
 
@@ -1561,24 +1559,19 @@ class iccProfile:
 
 if __name__ == "__main__":
     try:
-        parser = argparse.ArgumentParser(
-            prog='iccinspector'
-        )
-        parser.add_argument(
-            "iccfile",
-            type=argparse.FileType("rb")
-        )
+        parser = argparse.ArgumentParser(prog="iccinspector")
+        parser.add_argument("iccfile", type=argparse.FileType("rb"))
         parser.add_argument(
             "-t",
             dest="tagsignature",
             action="append",
-            help="specify tag signature to be inspected"
+            help="specify tag signature to be inspected",
         )
         parser.add_argument(
             "-e",
             dest="extract_lut",
             action="store_true",
-            help="extract lut from their respective tags"
+            help="extract lut from their respective tags",
         )
         args = parser.parse_args()
 
@@ -1608,5 +1601,5 @@ if __name__ == "__main__":
 
     except ICCFileError as e:
         print("Error loading ICC / ICM file: {}".format(e))
-    except Exception as e:
+    except Exception:
         raise

@@ -138,9 +138,9 @@ def unpack_s15Fixed16Number(s):
         numpy.frombuffer(s, numpy.dtype(">i4"), len(s) // 4), 2**16))
 
 
-def unpack_string(s):
+def unpack_string(s, codec="utf-8"):
     """Convert sequence of n bytes into a string"""
-    return struct.unpack("{}s".format(len(s)), s)[0].decode("utf-8")
+    return struct.unpack("{}s".format(len(s)), s)[0].decode(codec, errors='ignore')
 
 
 def unpack_tagSignature(s):
@@ -204,8 +204,8 @@ class XYZNumber:
                 self._XYZ[1], XYZ_sum, where=XYZ_sum != 0)
             self._xyY[2] = self._XYZ[1]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile size")
+        except Exception as e:
+            raise ICCFileError("Error parsing profile size: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}(XYZ({1}))'>".format(
@@ -237,7 +237,7 @@ class iccProfileElement:
         )
 
 
-# All ICC types ar defined below, based off of the iccProfileElement.
+# All ICC types are defined below, based off of the iccProfileElement.
 # To add an unsupported type, simply define a new class based off
 # of iccProfileElement with the four letter tag signature as the
 # first four letters of the class, followed by "Type". For example,
@@ -247,6 +247,65 @@ class iccProfileElement:
 #
 # Identification comment should identify the ICC specified type from
 # the specification, with the relevant four byte tag
+
+
+# multiLocalizedUnicodeType, identifier "mluc"
+class mlucRecord(object):
+    def __init__(self, lang, country, text):
+        self._lang = lang
+        self._country = country
+        self._text = text
+
+    def __str__(self):
+        return "[{}, {}, {}]".format(
+            self._lang,
+            self._country,
+            self._text
+        )
+
+class mlucType(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(mlucType, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._recordcount = None
+        self._recordsize = None
+        self._records = None
+        self._description = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            texttypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(texttypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(texttypebuffer[4:8])
+            self._recordcount = unpack_uInt32Number(texttypebuffer[8:12])
+            self._recordsize = unpack_uInt32Number(texttypebuffer[12:16])
+            self._records = []
+
+            for idx in range(self._recordcount):
+                start = 16 + idx * 12
+
+                lang = unpack_string(texttypebuffer[start:start+2])
+                country = unpack_string(texttypebuffer[start+2:start+4])
+                size = unpack_uInt32Number(texttypebuffer[start+4:start+8])
+                offset = unpack_uInt32Number(texttypebuffer[start+8:start+12])
+                text = unpack_string(
+                    texttypebuffer[offset:offset+size], codec="utf-16be")
+                self._records.append(mlucRecord(lang, country, text))
+
+        except Exception as e:
+            raise ICCFileError("problem loading mlucType: {}".format(str(e)))
+
+    def __str__(self):
+        return "[\"{}\", {}, {}, {}, {}]".format(
+            self._typesignature,
+            self._reserved,
+            self._recordcount,
+            self._recordsize,
+            ", ".join([str(r) for r in self._records])
+        )
+
 
 # curveType, identifier "curv"
 class curvType(iccProfileElement):
@@ -285,17 +344,28 @@ class curvType(iccProfileElement):
                 # Curve is a 1D curve of 16 bit integer entries
                 self._curvetype = "1D Curve"
 
-                integerarray = numpy.frombuffer(
+                self._curve = numpy.frombuffer(
                     curvtypebuffer,
-                    dtype=numpy.uint16,
+                    dtype=">u2",
                     count=self._entriescount,
                     offset=12
-                )
-
-                self._curve = numpy.divide(integerarray, (2**16 - 1))
+                ) / (2**16 - 1)
 
         except Exception as e:
-            raise ICCFileError("problem loading curvType")
+            raise ICCFileError("problem loading curvType: {}".format(str(e)))
+
+    def extract_lut(self, name):
+        lut = ""
+        lut += "Version 1\n"
+        lut += "From 0 1\n"
+        lut += "Length {}\n".format(self._curve.shape[0])
+        lut += "Components 1\n"
+        lut += "{\n"
+        lut += "\n".join(["  {:.5f}".format(v) for v in self._curve])
+        lut += "\n}"
+
+        with open(name + ".spi1d", "w") as f:
+            f.write(lut)
 
     def __str__(self):
         return "[\"{}\", {}, \"{}\", {}, {}]".format(
@@ -351,7 +421,7 @@ class paraType(iccProfileElement):
                     unpack_s15Fixed16Number(paratypebuffer[start:end])
 
         except Exception as e:
-            raise ICCFileError("problem loading paraType")
+            raise ICCFileError("problem loading paraType: {}".format(str(e)))
 
     def __str__(self):
         return "[\"{}\", {}, {}, {}, \"{}\", {}]".format(
@@ -361,6 +431,144 @@ class paraType(iccProfileElement):
             self._reservedsecond,
             self._function,
             self._parameters
+        )
+
+
+# cmSigVideoCardGammaType, identifier "vcgt"
+class vcgtTable(object):
+    def __init__(self, channels, entry_count, entry_size, data):
+        self._channels = channels
+        self._entry_count = entry_count
+        self._entry_size = entry_size
+        self._data = data
+
+    def __str__(self):
+        return "[{}, {}, {}, {}]".format(
+            self._channels,
+            self._entry_count,
+            self._entry_size,
+            self._data
+        )
+
+
+# cmVideoCardGammaFormula
+class vcgtFormulaComponent(object):
+    def __init__(self, gamma, min, max):
+        self._gamma = gamma
+        self._min = min
+        self._max = max
+
+    def __str__(self):
+        return "[{}, {}, {}]".format(
+            self._gamma,
+            self._min,
+            self._max
+        )
+
+
+# cmVideoCardGammaTable
+class vcgtFormula(object):
+    def __init__(self, red, green, blue):
+        self._red = red
+        self._green = green
+        self._blue = blue
+
+    def __str__(self):
+        return "[Red: {}, Green: {}, Blue: {}]".format(
+            self._red,
+            self._green,
+            self._blue
+        )
+
+class vcgtType(iccProfileElement):
+    def __init__(self, offset, length, buffer):
+        super(vcgtType, self).__init__(offset, length)
+        self._typesignature = None
+        self._reserved = None
+        self._gamma_type = None
+        self._gamma = None
+        self.read(buffer)
+
+    def read(self, buffer):
+        try:
+            vcgttypebuffer = buffer[self._slice]
+            self._typesignature = unpack_tagSignature(vcgttypebuffer[0:4])
+            self._reserved = unpack_uInt32Number(vcgttypebuffer[4:8])
+            self._gamma_type = unpack_uInt32Number(vcgttypebuffer[8:12])
+
+            if self._gamma_type == 0:
+                # VCGT is table based
+                channels = unpack_uInt16Number(vcgttypebuffer[12:14])
+                entry_count = unpack_uInt16Number(vcgttypebuffer[14:16])
+                entry_size = unpack_uInt16Number(vcgttypebuffer[16:18])
+
+                # Skip if we don't get Fixed representation for now
+                if entry_size != 2:
+                    return
+                data = numpy.frombuffer(
+                    vcgttypebuffer,
+                    dtype=">u2",
+                    count=channels * entry_count,
+                    offset=18
+                ) / (2**16 - 1)
+
+                self._gamma = vcgtTable(channels, entry_count, entry_size, data)
+
+            elif self._gamma_type == 1:
+                # VCGT is formula based
+                red_gamma = unpack_s15Fixed16Number(vcgttypebuffer[12:16])
+                red_min = unpack_s15Fixed16Number(vcgttypebuffer[16:20])
+                red_max = unpack_s15Fixed16Number(vcgttypebuffer[20:24])
+
+                green_gamma = unpack_s15Fixed16Number(vcgttypebuffer[24:28])
+                green_min = unpack_s15Fixed16Number(vcgttypebuffer[28:32])
+                green_max = unpack_s15Fixed16Number(vcgttypebuffer[32:36])
+
+                blue_gamma = unpack_s15Fixed16Number(vcgttypebuffer[36:40])
+                blue_min = unpack_s15Fixed16Number(vcgttypebuffer[40:44])
+                blue_max = unpack_s15Fixed16Number(vcgttypebuffer[44:48])
+
+                self._gamma = vcgtFormula(
+                    vcgtFormulaComponent(red_gamma, red_min, red_max),
+                    vcgtFormulaComponent(green_gamma, green_min, green_max),
+                    vcgtFormulaComponent(blue_gamma, blue_min, blue_max),
+                )
+
+        except Exception as e:
+            raise ICCFileError("problem loading vcgtType: {}".format(str(e)))
+
+    def extract_lut(self, name):
+        # Skip non table based vcgt
+        if self._gamma_type != 0:
+            return
+
+        table = self._gamma
+
+        lut = ""
+        lut += "Version 1\n"
+        lut += "From 0 1\n"
+        lut += "Length {}\n".format(table._entry_count)
+        lut += "Components {}\n".format(table._channels)
+        lut += "{\n"
+        if table._channels == 1:
+            lut += "\n".join(["  {:.5f}".format(v) for v in table._data])
+            lut += "\n"
+        elif table._channels == 3:
+            data = table._data.reshape(-1, 3, order='F')
+            for idx in range(data.shape[0]):
+                lut += "  {:.5f}  {:.5f}  {:.5f}\n".format(
+                    data[idx,0], data[idx,1], data[idx,2])
+        lut += "}"
+
+        with open(name + ".spi1d", "w") as f:
+            f.write(lut)
+
+    def __str__(self):
+        return "[\"{}\", {}, {}, {}]".format(
+            self._typesignature,
+            self._reserved,
+            self._gamma_type,
+            self._gamma,
         )
 
 
@@ -410,8 +618,8 @@ class descType(iccProfileElement):
                 desctypebuffer[endofunicode + 3:endofunicode + 70]
             )
 
-        except Exception:
-            raise ICCFileError("problem loading descType")
+        except Exception as e:
+            raise ICCFileError("problem loading descType: {}".format(str(e)))
 
     def __str__(self):
         return "[\"{}\", {}, {}, \"{}\", {}, {}, \"{}\", {}, {}, \"{}\"]" \
@@ -445,14 +653,14 @@ class textType(iccProfileElement):
             self._reserved = unpack_uInt32Number(texttypebuffer[4:8])
             self._description = unpack_string(texttypebuffer[8:])
 
-        except Exception:
-            raise ICCFileError("problem loading textType")
+        except Exception as e:
+            raise ICCFileError("problem loading textType: {}".format(str(e)))
 
     def __str__(self):
         return "[\"{}\", {}, \"{}\"]".format(
             self._typesignature,
             self._reserved,
-            self._description
+            textwrap.shorten(self._description, width=256)
         )
 
 
@@ -484,8 +692,8 @@ class XYZ_Type(iccProfileElement):
                 stop = ((count + 1) * 12) + 8
                 self._XYZ[count].read(xyztypebuffer[start:stop])
 
-        except Exception:
-            raise ICCFileError("problem loading XYZ_Type")
+        except Exception as e:
+            raise ICCFileError("problem loading XYZ_Type: {}".format(str(e)))
 
     def __str__(self):
         xyzstring = ""
@@ -528,8 +736,8 @@ class sf32Type(iccProfileElement):
                 sf32typebuffer[8:self._slice.stop]
             )
 
-        except Exception:
-            raise ICCFileError("problem loading sf32Type")
+        except Exception as e:
+            raise ICCFileError("problem loading sf32Type: {}".format(str(e)))
 
     def __str__(self):
         sf32string = ""
@@ -560,8 +768,8 @@ class iccProfileSize(iccProfileElement):
             profilesizebuffer = buffer[self._slice]
             self._profilesize = unpack_uInt32Number(profilesizebuffer)
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile size")
+        except Exception as e:
+            raise ICCFileError("Error parsing profile size: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profilesize({2}))'>".format(
@@ -587,9 +795,9 @@ class iccPreferredCMMType(iccProfileElement):
             self._preferredcmmtype = unpack_tagSignature(
                 preferredcmmtypebuffer)
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a prefered CMM "
-                               "type")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing prefered CMMtype: {}".format(str(e)))
 
     @property
     def preferredcmmtype(self):
@@ -624,9 +832,9 @@ class iccProfileVersion(iccProfileElement):
                 0b00001111
             self._reserved = struct.unpack("H", versionbuffer[2:4])[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile version "
-                               )
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile version: {}".format(str(e)))
 
     @property
     def majorVersion(self):
@@ -670,9 +878,9 @@ class iccProfileDeviceClass(iccProfileElement):
             self._profiledeviceclassdescription = \
                 _profileclasssignatures.get(self._profiledeviceclass, "None")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile / "
-                               "device class")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile / device class: {}".format(str(e)))
 
     @property
     def profiledeviceclass(self):
@@ -711,8 +919,9 @@ class iccDataColorSpace(iccProfileElement):
             self._datacolorspacedescription = \
                 _colorspacesignatures.get(self._datacolorspace, "None")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a data colorspace")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing data colorspace: {}".format(str(e)))
 
     @property
     def datacolorspace(self):
@@ -749,8 +958,8 @@ class iccPCS(iccProfileElement):
             self._pcs = unpack_tagSignature(pcsbuffer[0:4])
             self._pcsdescription = _colorspacesignatures.get(self._pcs, "None")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a PCS")
+        except Exception as e:
+            raise ICCFileError("Error parsing PCS: {}".format(str(e)))
 
     @property
     def pcs(self):
@@ -793,8 +1002,9 @@ class iccDateTimeNumber(iccProfileElement):
         except ValueError as error:
             print("iccDateTimeNumber Exception: {}".format(error))
             pass
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a datetime number")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing datetime number: {}".format(str(e)))
 
     @property
     def datetime(self):
@@ -831,9 +1041,9 @@ class iccProfileFileSignature(iccProfileElement):
             if self._profilefilesignature != "acsp":
                 raise ICCFileError("file doesn't appear to be an ICC / ICM")
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile file "
-                               "signature")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile file signature: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profilefilesignature({2}))'>".format(
@@ -870,10 +1080,9 @@ class iccPrimaryPlatform(iccProfileElement):
             self._primaryplatformdescription = \
                 _primaryplatformsignatures.get(self._primaryplatform, "None")
 
-        except Exception:
+        except Exception as e:
             raise ICCFileError(
-                "file doesn't appear to have a primary platform"
-            )
+                "Error parsing primary platform: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, primaryplatform('{2}', '{3}'))'>".format(
@@ -905,9 +1114,9 @@ class iccProfileFlags(iccProfileElement):
             self._profileflags = struct.unpack(
                 "=4b", profileflagsbuffer[0:4])[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have profile flags"
-                               )
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile flags: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profileflags({2:032b}))'>".format(
@@ -937,9 +1146,9 @@ class iccDeviceManufacturer(iccProfileElement):
             self._devicemanufacturer = unpack_tagSignature(
                 devicemanufacturerbuffer[0:4])
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a device "
-                               "manufacturer")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing device manufacturer: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, devicemanufacturer('{2}'))'>".format(
@@ -968,8 +1177,8 @@ class iccDeviceModel(iccProfileElement):
             devicemodelbuffer = buffer[self._slice]
             self._devicemodel = unpack_tagSignature(devicemodelbuffer[0:4])
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a device model")
+        except Exception as e:
+            raise ICCFileError("Error parsing device model: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, devicemodel('{2}'))'>".format(
@@ -999,10 +1208,9 @@ class iccDeviceAttributes(iccProfileElement):
             self._deviceattributes = struct.unpack(
                 "=8b", deviceattributesbuffer[0:8])[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have device "
-                               "attributes flags"
-                               )
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing device attributes flags: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, deviceattributesflags({2:064b}))'>".format(
@@ -1039,9 +1247,9 @@ class iccRenderingIntent(iccProfileElement):
             self._renderingintentdescription = \
                 _renderingintenttable[self._renderingintent]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a rendering intent"
-                               )
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing rendering intent: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, renderingintent({2}, '{3}'))'>".format(
@@ -1072,9 +1280,9 @@ class iccPCSIlluminant(iccProfileElement):
             pcsilluminantxyzbuffer = buffer[self._slice]
             self._pcsilluminant.read(pcsilluminantxyzbuffer)
 
-        except Exception:
+        except Exception as e:
             raise ICCFileError(
-                "file doesn't appear to have a rendering intent")
+                "Error parsing PCS illuminant: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, pcsilluminant({2}))'>".format(
@@ -1103,8 +1311,9 @@ class iccProfileCreator(iccProfileElement):
             self._profilecreator = unpack_tagSignature(
                 profilecreatorbuffer[0:4])
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile creator")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing profile creator: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profilecreator('{2}'))'>".format(
@@ -1135,8 +1344,8 @@ class iccProfileID(iccProfileElement):
             self._profileid = struct.unpack(
                 "{0}s".format(count), profileidbuffer)[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a profile ID")
+        except Exception as e:
+            raise ICCFileError("Error parsing profile ID: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, profileid('{2}'))'>".format(
@@ -1163,8 +1372,9 @@ class iccReserved(iccProfileElement):
             self._reserved = struct.unpack(
                 "{0}s".format(count), reservedbuffer)[0]
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a reserved field")
+        except Exception as e:
+            raise ICCFileError(
+                "Error parsing reserved field: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, reserved('{2}'))'>".format(
@@ -1224,8 +1434,9 @@ class iccTag(iccProfileElement):
             except AttributeError:
                 pass
 
-        except Exception:
-            raise ICCFileError("error while reading tag signature")
+        except Exception as e:
+            raise ICCFileError(
+                "Error reading tag signature: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, tag('{2}'))'>".format(
@@ -1270,8 +1481,8 @@ class iccTagTable(iccProfileElement):
                 tag.read(buffer)
                 self._tags[count] = (tag.signature, tag)
 
-        except Exception:
-            raise ICCFileError("file doesn't appear to have a tag table")
+        except Exception as e:
+            raise ICCFileError("Error parsing tag table: {}".format(str(e)))
 
     def __repr__(self):
         return "<class '{0}({1}, tagtable('{2}'))'>".format(
@@ -1326,7 +1537,11 @@ class iccProfile:
 
     def read(self, buffer):
         for _, var in vars(self).items():
-            var.read(buffer)
+            try:
+                var.read(buffer)
+            except Exception as e:
+                print("Skip {}: {}".format(type(var).__name__, str(e)))
+                continue
 
     def __str__(self):
         string = ""
@@ -1357,9 +1572,15 @@ if __name__ == "__main__":
             action="append",
             help="specify tag signature to be inspected"
         )
+        parser.add_argument(
+            "-e",
+            dest="extract_lut",
+            action="store_true",
+            help="extract lut from their respective tags"
+        )
         args = parser.parse_args()
 
-        numpy.set_printoptions(15)
+        numpy.set_printoptions(15, threshold=128)
 
         with args.iccfile as f:
             s = memoryview(f.read())
@@ -1375,6 +1596,13 @@ if __name__ == "__main__":
             #             tagsignature)
             #         ]
             #     )
+
+        if args.extract_lut:
+            for (signature, tag) in testField.tags:
+                try:
+                    tag.type.extract_lut(signature)
+                except Exception:
+                    continue
 
     except ICCFileError as e:
         print("Error loading ICC / ICM file: {}".format(e))

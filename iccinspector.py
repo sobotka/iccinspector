@@ -481,6 +481,7 @@ class vcgtFormula(object):
             self._blue
         )
 
+
 class vcgtType(iccProfileElement):
     def __init__(self, offset, length, buffer):
         super(vcgtType, self).__init__(offset, length)
@@ -558,7 +559,7 @@ class vcgtType(iccProfileElement):
             data = table._data.reshape(-1, 3, order='F')
             for idx in range(data.shape[0]):
                 lut += "  {:.5f}  {:.5f}  {:.5f}\n".format(
-                    data[idx,0], data[idx,1], data[idx,2])
+                    data[idx, 0], data[idx, 1], data[idx, 2])
         lut += "}"
 
         with open(name + ".spi1d", "w") as f:
